@@ -489,7 +489,7 @@ def train(hf_id: str, hp: dict, args):
 
     training_args = SFTConfig(
         output_dir=output_dir,
-        max_seq_length=hp["max_seq_len"],
+        max_length=hp["max_seq_len"],
         dataset_text_field="text",
         num_train_epochs=hp["epochs"],
         per_device_train_batch_size=hp["batch_size"],
@@ -499,7 +499,7 @@ def train(hf_id: str, hp: dict, args):
         lr_scheduler_type="cosine",
         warmup_ratio=hp["warmup_ratio"],
         weight_decay=0.01,
-        evaluation_strategy="steps",
+        eval_strategy="steps",
         eval_steps=100,
         save_strategy="steps",
         save_steps=100,
@@ -524,7 +524,7 @@ def train(hf_id: str, hp: dict, args):
 
     trainer = SFTTrainer(
         model=model,
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         train_dataset=train_ds,
         eval_dataset=val_ds,
         data_collator=collator,
