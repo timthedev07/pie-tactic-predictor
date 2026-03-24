@@ -14,9 +14,11 @@ Requirements:
 """
 
 import argparse
+import csv
 import json
 import os
 import random
+import time
 from pathlib import Path
 
 # Use fast local storage for model downloads instead of the default ~/.cache
@@ -532,7 +534,9 @@ def train(hf_id: str, hp: dict, args):
     )
 
     print("\nTraining...\n")
+    t0 = time.time()
     trainer.train()
+    total_training_seconds = time.time() - t0
 
     final_path = os.path.join(output_dir, "final")
     trainer.save_model(final_path)
@@ -543,11 +547,155 @@ def train(hf_id: str, hp: dict, args):
     with open(os.path.join(output_dir, "run_config.json"), "w") as f:
         json.dump({"hf_id": hf_id, "hyperparameters": hp}, f, indent=2)
 
+    # Save per-step training log as CSV
+    _save_training_csv(
+        trainer,
+        hf_id=hf_id,
+        hp=hp,
+        total_training_seconds=total_training_seconds,
+        train_size=len(train_rows),
+        val_size=len(val_rows),
+        output_dir=output_dir,
+    )
+
     return trainer, tokenizer, model, test_rows
 
 
 # ---------------------------------------------------------------------------
-# 8. Quick inference check
+# 8. Training CSV export
+# ---------------------------------------------------------------------------
+
+
+def _save_training_csv(
+    trainer,
+    *,
+    hf_id: str,
+    hp: dict,
+    total_training_seconds: float,
+    train_size: int,
+    val_size: int,
+    output_dir: str,
+):
+    """Write a detailed per-step CSV from trainer.state.log_history."""
+    log_history = trainer.state.log_history
+    if not log_history:
+        print("[csv] No log history available — skipping CSV export.")
+        return
+
+    # Collect all unique column names across all log entries, preserving a
+    # sensible order: step/epoch first, then losses, then accuracies, rest.
+    priority = [
+        "step",
+        "epoch",
+        "loss",
+        "eval_loss",
+        "mean_token_accuracy",
+        "eval_mean_token_accuracy",
+        "entropy",
+        "eval_entropy",
+        "grad_norm",
+        "learning_rate",
+        "eval_runtime",
+        "eval_samples_per_second",
+        "eval_steps_per_second",
+        "train_runtime",
+        "train_samples_per_second",
+        "train_steps_per_second",
+        "total_flos",
+    ]
+    seen = set()
+    ordered_cols: list[str] = []
+    for col in priority:
+        if any(col in entry for entry in log_history):
+            ordered_cols.append(col)
+            seen.add(col)
+    for entry in log_history:
+        for col in entry:
+            if col not in seen:
+                ordered_cols.append(col)
+                seen.add(col)
+
+    csv_path = os.path.join(output_dir, "training_log.csv")
+    with open(csv_path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=ordered_cols, extrasaction="ignore")
+        writer.writeheader()
+        for entry in log_history:
+            writer.writerow(entry)
+
+    # Append a summary row for quick scanning
+    summary_path = os.path.join(output_dir, "training_summary.csv")
+    state = trainer.state
+
+    # Pull best eval loss and best step from log history
+    eval_entries = [e for e in log_history if "eval_loss" in e]
+    best_eval_loss = min((e["eval_loss"] for e in eval_entries), default="")
+    best_eval_acc = (
+        max((e.get("eval_mean_token_accuracy", 0) for e in eval_entries), default="")
+        if eval_entries
+        else ""
+    )
+    train_entries = [e for e in log_history if "loss" in e and "eval_loss" not in e]
+    final_train_loss = train_entries[-1]["loss"] if train_entries else ""
+    final_train_acc = (
+        train_entries[-1].get("mean_token_accuracy", "") if train_entries else ""
+    )
+
+    summary_fields = [
+        "hf_id",
+        "total_training_seconds",
+        "total_training_minutes",
+        "total_steps",
+        "total_epochs",
+        "train_samples",
+        "val_samples",
+        "final_train_loss",
+        "final_train_accuracy",
+        "best_eval_loss",
+        "best_eval_accuracy",
+        "lora_r",
+        "lora_alpha",
+        "batch_size",
+        "grad_accum",
+        "effective_batch_size",
+        "lr",
+        "epochs_config",
+        "max_seq_len",
+    ]
+    write_header = not os.path.exists(summary_path)
+    with open(summary_path, "a", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=summary_fields)
+        if write_header:
+            writer.writeheader()
+        writer.writerow(
+            {
+                "hf_id": hf_id,
+                "total_training_seconds": round(total_training_seconds, 1),
+                "total_training_minutes": round(total_training_seconds / 60, 2),
+                "total_steps": state.global_step,
+                "total_epochs": round(state.epoch, 4) if state.epoch else "",
+                "train_samples": train_size,
+                "val_samples": val_size,
+                "final_train_loss": final_train_loss,
+                "final_train_accuracy": final_train_acc,
+                "best_eval_loss": best_eval_loss,
+                "best_eval_accuracy": best_eval_acc,
+                "lora_r": hp["lora_r"],
+                "lora_alpha": hp["lora_alpha"],
+                "batch_size": hp["batch_size"],
+                "grad_accum": hp["grad_accum"],
+                "effective_batch_size": hp["batch_size"] * hp["grad_accum"],
+                "lr": hp["lr"],
+                "epochs_config": hp["epochs"],
+                "max_seq_len": hp["max_seq_len"],
+            }
+        )
+
+    print(f"  Training log  → {csv_path}")
+    print(f"  Summary row   → {summary_path}")
+
+
+# ---------------------------------------------------------------------------
+# 9. Quick inference check
 # ---------------------------------------------------------------------------
 
 
