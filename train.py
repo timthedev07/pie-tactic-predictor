@@ -191,6 +191,18 @@ def parse_args():
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--output-dir", type=str, default=None)
 
+    # Multi-GPU parallel training
+    parser.add_argument(
+        "--parallel",
+        action="store_true",
+        help="Train every model in models.json simultaneously, one per GPU.",
+    )
+    parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="Skip the interactive confirmation prompt (used internally by --parallel).",
+    )
+
     return parser.parse_args()
 
 
@@ -530,12 +542,87 @@ def test_inference(model, tokenizer, test_rows: list[dict], n: int = 5):
 # 9. Entry point
 # ---------------------------------------------------------------------------
 
+
+def _run_parallel(args):
+    """Spawn one subprocess per model in models.json, capped to n_gpus concurrent jobs."""
+    import queue
+    import subprocess
+    import sys
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    models = load_models_list()
+    if not models:
+        print("[parallel] No models found in models.json — nothing to do.")
+        return
+
+    n_gpus = torch.cuda.device_count()
+    if n_gpus == 0:
+        print("[parallel] No CUDA GPUs detected — cannot run parallel training.")
+        exit(1)
+
+    print(f"\n[parallel] {len(models)} model(s) × {n_gpus} GPU(s) available")
+    print("[parallel] Models will be queued and dispatched as GPUs free up.\n")
+
+    gpu_pool: queue.Queue[int] = queue.Queue()
+    for i in range(n_gpus):
+        gpu_pool.put(i)
+
+    def launch(model_entry: dict):
+        gpu_idx = gpu_pool.get()
+        try:
+            env = os.environ.copy()
+            env["CUDA_VISIBLE_DEVICES"] = str(gpu_idx)
+
+            cmd = [
+                sys.executable,
+                __file__,
+                "--model",
+                model_entry["id"],
+                "--yes",
+                "--data",
+                args.data,
+                "--val-split",
+                str(args.val_split),
+                "--test-split",
+                str(args.test_split),
+                "--seed",
+                str(args.seed),
+            ]
+            if args.output_dir:
+                cmd += ["--output-dir", args.output_dir]
+            if args.load_in_4bit:
+                cmd.append("--load-in-4bit")
+            if args.load_in_8bit:
+                cmd.append("--load-in-8bit")
+
+            print(f"  [GPU {gpu_idx}] starting  {model_entry['id']}")
+            proc = subprocess.Popen(cmd, env=env)
+            proc.wait()
+            rc = proc.returncode
+            status = "done" if rc == 0 else f"FAILED (exit {rc})"
+            print(f"  [GPU {gpu_idx}] finished  {model_entry['id']} — {status}")
+            return model_entry["id"], rc
+        finally:
+            gpu_pool.put(gpu_idx)
+
+    with ThreadPoolExecutor(max_workers=n_gpus) as pool:
+        futures = [pool.submit(launch, m) for m in models]
+        for fut in as_completed(futures):
+            fut.result()  # re-raise any unexpected exception
+
+    print("\n[parallel] All training jobs complete.")
+
+
 if __name__ == "__main__":
     args = parse_args()
     models = load_models_list()
 
     random.seed(args.seed)
     torch.manual_seed(args.seed)
+
+    if args.parallel:
+        _run_parallel(args)
+        exit(0)
 
     # Resolve which model to use
     if args.model is None:
@@ -575,10 +662,11 @@ if __name__ == "__main__":
     print(f"  output dir       : {args.output_dir or './output/' + args.model_id}")
     print(f"{'='*62}")
 
-    confirm = input("\n  Start training? [Y/n]: ").strip().lower()
-    if confirm not in ("", "y", "yes"):
-        print("  Aborted.")
-        exit(0)
+    if not args.yes:
+        confirm = input("\n  Start training? [Y/n]: ").strip().lower()
+        if confirm not in ("", "y", "yes"):
+            print("  Aborted.")
+            exit(0)
 
     trainer, tokenizer, model, test_rows = train(model_entry["hf_id"], hp, args)
     test_inference(model, tokenizer, test_rows, n=5)
