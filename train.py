@@ -26,9 +26,45 @@ from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     BitsAndBytesConfig,
-    TrainingArguments,
 )
-from trl import SFTTrainer, DataCollatorForCompletionOnlyLM
+from trl import SFTTrainer, SFTConfig
+
+
+class _CompletionOnlyCollator:
+    """Masks loss on prompt tokens so the model only trains on the tactic.
+    Drop-in replacement for the removed DataCollatorForCompletionOnlyLM."""
+
+    def __init__(self, response_template: str, tokenizer):
+        self.tokenizer = tokenizer
+        self.template_ids = tokenizer.encode(
+            response_template, add_special_tokens=False
+        )
+
+    def __call__(self, features: list[dict]) -> dict:
+        input_ids = torch.nn.utils.rnn.pad_sequence(
+            [torch.tensor(f["input_ids"]) for f in features],
+            batch_first=True,
+            padding_value=self.tokenizer.pad_token_id,
+        )
+        attention_mask = (input_ids != self.tokenizer.pad_token_id).long()
+        labels = input_ids.clone()
+        tmpl = self.template_ids
+        tlen = len(tmpl)
+        for row in labels:
+            ids = row.tolist()
+            for j in range(len(ids) - tlen + 1):
+                if ids[j : j + tlen] == tmpl:
+                    row[: j + tlen] = -100
+                    break
+            else:
+                row[:] = -100  # template not found — skip sample
+        # Also mask padding
+        labels[input_ids == self.tokenizer.pad_token_id] = -100
+        return {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "labels": labels,
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -436,13 +472,15 @@ def train(hf_id: str, hp: dict, args):
     model.print_trainable_parameters()
 
     # Loss masking — train only on the tactic completion
-    collator = DataCollatorForCompletionOnlyLM(
+    collator = _CompletionOnlyCollator(
         response_template="\n### Next tactic\n",
         tokenizer=tokenizer,
     )
 
-    training_args = TrainingArguments(
+    training_args = SFTConfig(
         output_dir=output_dir,
+        max_seq_length=hp["max_seq_len"],
+        dataset_text_field="text",
         num_train_epochs=hp["epochs"],
         per_device_train_batch_size=hp["batch_size"],
         per_device_eval_batch_size=hp["batch_size"],
@@ -480,8 +518,6 @@ def train(hf_id: str, hp: dict, args):
         train_dataset=train_ds,
         eval_dataset=val_ds,
         data_collator=collator,
-        dataset_text_field="text",
-        max_seq_length=hp["max_seq_len"],
         args=training_args,
     )
 
