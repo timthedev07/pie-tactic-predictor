@@ -320,12 +320,19 @@ def row_to_text(row: dict) -> str:
 
 
 def load_jsonl(path: str) -> list[dict]:
-    rows = []
     with open(path) as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                rows.append(json.loads(line))
+        content = f.read()
+    decoder = json.JSONDecoder()
+    rows = []
+    idx = 0
+    while idx < len(content):
+        while idx < len(content) and content[idx].isspace():
+            idx += 1
+        if idx >= len(content):
+            break
+        obj, end = decoder.raw_decode(content, idx)
+        rows.append(obj)
+        idx = end
     return rows
 
 

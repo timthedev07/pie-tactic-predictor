@@ -1,11 +1,4 @@
-{
-  "theoremName":"true-check",
-  "theoremType":"(= (Either Trivial Trivial) \n              (left sole) \n              (left sole))",
-  "stepIndex":0,
-  "globalContext":[{"name":"Bool","type":"U"},{"name":"true","type":"(Either Trivial Trivial)"},{"name":"false","type":"(Either Trivial Trivial)"}],
-  "localContext":[],
-  "goal":"(= (Either Trivial Trivial) (left sole) (left sole))",
-  "tactic":"exact (same (left Sole))"}
+{"theoremName":"true-check","theoremType":"(= (Either Trivial Trivial) \n              (left sole) \n              (left sole))","stepIndex":0,"globalContext":[{"name":"Bool","type":"U"},{"name":"true","type":"(Either Trivial Trivial)"},{"name":"false","type":"(Either Trivial Trivial)"}],"localContext":[],"goal":"(= (Either Trivial Trivial) (left sole) (left sole))","tactic":"exact (same (left Sole))"}
 {"theoremName":"false-check","theoremType":"(= (Either Trivial Trivial) \n              (right sole) \n              (right sole))","stepIndex":0,"globalContext":[{"name":"Bool","type":"U"},{"name":"true","type":"(Either Trivial Trivial)"},{"name":"false","type":"(Either Trivial Trivial)"},{"name":"true-check","type":"(= (Either Trivial Trivial) \n              (left sole) \n              (left sole))"}],"localContext":[],"goal":"(= (Either Trivial Trivial) (right sole) (right sole))","tactic":"exact (same (right Sole))"}
 {"theoremName":"not-true-check","theoremType":"(= (Either Trivial Trivial) \n              (right sole) \n              (right sole))","stepIndex":0,"globalContext":[{"name":"Bool","type":"U"},{"name":"true","type":"(Either Trivial Trivial)"},{"name":"false","type":"(Either Trivial Trivial)"},{"name":"not-bool","type":"(Π (x (Either Trivial Trivial)) \n          (Either Trivial Trivial))"}],"localContext":[],"goal":"(= (Either Trivial Trivial) (right sole) (right sole))","tactic":"exact (same (right Sole))"}
 {"theoremName":"not-false-check","theoremType":"(= (Either Trivial Trivial) \n              (left sole) \n              (left sole))","stepIndex":0,"globalContext":[{"name":"Bool","type":"U"},{"name":"true","type":"(Either Trivial Trivial)"},{"name":"false","type":"(Either Trivial Trivial)"},{"name":"not-bool","type":"(Π (x (Either Trivial Trivial)) \n          (Either Trivial Trivial))"},{"name":"not-true-check","type":"(= (Either Trivial Trivial) \n              (right sole) \n              (right sole))"}],"localContext":[],"goal":"(= (Either Trivial Trivial) (left sole) (left sole))","tactic":"exact (same (left Sole))"}
