@@ -19,6 +19,9 @@ import os
 import random
 from pathlib import Path
 
+# Use fast local storage for model downloads instead of the default ~/.cache
+os.environ.setdefault("HF_HOME", "/localhome/timbao/.cache/huggingface")
+
 import torch
 from datasets import Dataset
 from peft import LoraConfig, get_peft_model, TaskType
