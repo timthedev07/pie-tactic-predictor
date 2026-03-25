@@ -90,7 +90,7 @@ Ten candidate models spanning 1.3B to 34B parameters were evaluated. Table~\ref{
       \texttt{mistral-7b}          & \texttt{}                                     & ---               & ---               & ---            & ---                  & ?                    & ---         & ---             & $\times$         \\
       \texttt{phi-2}               & \texttt{}                                     & ---               & ---               & ---            & ---                  & ?                    & ---         & ---             & $\times$         \\
       \texttt{phi-3-mini}          & \texttt{}                                     & ---               & ---               & ---            & ---                  & ?                    & ---         & ---             & $\times$         \\
-      \texttt{qwen2.5-coder-1.5b}  & \texttt{Qwen/Qwen2.5-Coder-1.5B}              & 64                & 128               & 16             & 2                    & 32                   & 0.0002      & 5               & $\times$         \\
+      \texttt{qwen2.5-coder-1.5b}  & \texttt{Qwen/Qwen2.5-Coder-1.5B}              & 64                & 128               & 16             & 2                    & 32                   & 0.0002      & 5               & $\checkmark$     \\
       \texttt{qwen2.5-coder-7b}    & \texttt{Qwen/Qwen2.5-Coder-7B}                & 32                & 64                & 8              & 4                    & 32                   & 0.0001      & 5               & $\times$         \\
       \bottomrule
     \end{tabular}}
@@ -115,14 +115,15 @@ boundary. These runs are included for completeness.
   \resizebox{\textwidth}{!}{%
     \begin{tabular}{lrrrrrrr}
       \toprule
-      \textbf{Model}                                & \textbf{Time (min)}      & \textbf{Steps} &
-      \textbf{Train loss}                           & \textbf{Train acc.}      &
-      \textbf{Best val.\ loss}                      & \textbf{Best val.\ acc.}                                                        \\
+      \textbf{Model}                                     & \textbf{Time (min)}      & \textbf{Steps} &
+      \textbf{Train loss}                                & \textbf{Train acc.}      &
+      \textbf{Best val.\ loss}                           & \textbf{Best val.\ acc.}                                                                  \\
       \midrule
-      \texttt{codellama-13b} \textsuperscript{\dag} & 237.7                    & 1025           & 0.0000 & 0.00\%  & ---    & 0.00\%  \\
-      \texttt{codellama-7b} \textsuperscript{\dag}  & 161.8                    & 1025           & 0.0000 & 0.00\%  & ---    & 0.00\%  \\
-      \texttt{deepseek-coder-1.3b}                  & 71.7                     & 1025           & 0.0112 & 99.38\% & 0.1970 & 95.90\% \\
-      \texttt{deepseek-coder-6.7b}                  & 174.1                    & 1025           & 0.0081 & 99.54\% & 0.1456 & 96.89\% \\
+      \texttt{codellama-13b} \textsuperscript{\dag}      & 237.7                    & 1025           & {-}{-}{-} & {-}{-}{-} & {-}{-}{-} & {-}{-}{-} \\
+      \texttt{codellama-7b} \textsuperscript{\dag}       & 161.8                    & 1025           & {-}{-}{-} & {-}{-}{-} & {-}{-}{-} & {-}{-}{-} \\
+      \texttt{deepseek-coder-1.3b}                       & 71.7                     & 1025           & 0.0112    & 99.38\%   & 0.1970    & 95.90\%   \\
+      \texttt{deepseek-coder-6.7b}                       & 174.1                    & 1025           & 0.0081    & 99.54\%   & 0.1456    & 96.89\%   \\
+      \texttt{qwen2.5-coder-1.5b} \textsuperscript{\dag} & 66.3                     & 1025           & {-}{-}{-} & {-}{-}{-} & {-}{-}{-} & {-}{-}{-} \\
       \bottomrule
     \end{tabular}}
 \end{table}
@@ -181,6 +182,8 @@ behaviour are excluded from the accuracy subplots for clarity.
       \addlegendentry{\texttt{deepseek-coder-1.3b}}
       \addplot[color=ds67b, thick] coordinates { (20.0000,0.447885) (40.0000,0.801662) (60.0000,0.902607) (80.0000,0.948206) (100.0000,0.961117) (120.0000,0.967957) (140.0000,0.965626) (160.0000,0.963594) (180.0000,0.974916) (200.0000,0.978576) (220.0000,0.978891) (240.0000,0.980689) (260.0000,0.985188) (280.0000,0.984134) (300.0000,0.979467) (320.0000,0.980552) (340.0000,0.985416) (360.0000,0.986308) (380.0000,0.985213) (400.0000,0.989361) (420.0000,0.990715) (440.0000,0.993105) (460.0000,0.991295) (480.0000,0.990427) (500.0000,0.987724) (520.0000,0.990966) (540.0000,0.987478) (560.0000,0.991727) (580.0000,0.994359) (600.0000,0.993045) (620.0000,0.991571) (640.0000,0.992605) (660.0000,0.995343) (680.0000,0.992335) (700.0000,0.995840) (720.0000,0.993121) (740.0000,0.993987) (760.0000,0.994786) (780.0000,0.991695) (800.0000,0.995453) (820.0000,0.994353) (840.0000,0.994032) (860.0000,0.996484) (880.0000,0.996529) (900.0000,0.993352) (920.0000,0.995121) (940.0000,0.993661) (960.0000,0.994507) (980.0000,0.995555) (1000.0000,0.995546) (1020.0000,0.995437) };
       \addlegendentry{\texttt{deepseek-coder-6.7b}}
+      \addplot[color=violet, thick] coordinates { (20.0000,0.000000) (40.0000,0.000000) (60.0000,0.000000) (80.0000,0.000000) (100.0000,0.000000) (120.0000,0.000000) (140.0000,0.000000) (160.0000,0.000000) (180.0000,0.000000) (200.0000,0.000000) (220.0000,0.000000) (240.0000,0.000000) (260.0000,0.000000) (280.0000,0.000000) (300.0000,0.000000) (320.0000,0.000000) (340.0000,0.000000) (360.0000,0.000000) (380.0000,0.000000) (400.0000,0.000000) (420.0000,0.000000) (440.0000,0.000000) (460.0000,0.000000) (480.0000,0.000000) (500.0000,0.000000) (520.0000,0.000000) (540.0000,0.000000) (560.0000,0.000000) (580.0000,0.000000) (600.0000,0.000000) (620.0000,0.000000) (640.0000,0.000000) (660.0000,0.000000) (680.0000,0.000000) (700.0000,0.000000) (720.0000,0.000000) (740.0000,0.000000) (760.0000,0.000000) (780.0000,0.000000) (800.0000,0.000000) (820.0000,0.000000) (840.0000,0.000000) (860.0000,0.000000) (880.0000,0.000000) (900.0000,0.000000) (920.0000,0.000000) (940.0000,0.000000) (960.0000,0.000000) (980.0000,0.000000) (1000.0000,0.000000) (1020.0000,0.000000) };
+      \addlegendentry{\texttt{qwen2.5-coder-1.5b}}
     \end{axis}
   \end{tikzpicture}
   \caption{Training loss (left) and per-step token accuracy (right) across training steps.}
@@ -248,7 +251,7 @@ to this tactic-prediction task. The best-performing model overall was
 
 \subsection{Degenerate Runs}
 
-Training for \texttt{codellama-13b}, \texttt{codellama-7b} produced \texttt{loss = 0.0} and
+Training for \texttt{codellama-13b}, \texttt{codellama-7b}, \texttt{qwen2.5-coder-1.5b} produced \texttt{loss = 0.0} and
 \texttt{accuracy = 0.0} throughout, indicating that the completion-only
 data collator could not locate the response-boundary template in the tokenised
 sequences. This is a known issue when a tokeniser's vocabulary does not contain
@@ -258,14 +261,14 @@ with an adjusted prompt template or by disabling the completion-only masking.
 \subsection{Untrained Models}
 
 The following models were configured but not trained in this experiment:
-\texttt{codellama-34b}, \texttt{mistral-7b}, \texttt{phi-2}, \texttt{phi-3-mini}, \texttt{qwen2.5-coder-1.5b}, \texttt{qwen2.5-coder-7b}.
+\texttt{codellama-34b}, \texttt{mistral-7b}, \texttt{phi-2}, \texttt{phi-3-mini}, \texttt{qwen2.5-coder-7b}.
 These represent larger or alternative architectures that would require
 additional compute budget.
 
 \subsection{Compute Budget}
 
 Total GPU time across all completed runs was approximately
-\textbf{10.8 GPU-hours}.
+\textbf{11.9 GPU-hours}.
 
 \subsection{Recommendations}
 
@@ -311,7 +314,7 @@ Total GPU time across all completed runs was approximately
     Total training time (min) & 237.7                               \\
     Final training loss       & 0.0000                              \\
     Final training accuracy   & 0.00\%                              \\
-    Best validation loss      & ---                                 \\
+    Best validation loss      & {-}{-}{-}                           \\
     Best validation accuracy  & 0.00\%                              \\
     \bottomrule
   \end{tabular}
@@ -343,7 +346,7 @@ Total GPU time across all completed runs was approximately
     Total training time (min) & 161.8                              \\
     Final training loss       & 0.0000                             \\
     Final training accuracy   & 0.00\%                             \\
-    Best validation loss      & ---                                \\
+    Best validation loss      & {-}{-}{-}                          \\
     Best validation accuracy  & 0.00\%                             \\
     \bottomrule
   \end{tabular}
@@ -409,6 +412,38 @@ Total GPU time across all completed runs was approximately
     Final training accuracy   & 99.54\%                                       \\
     Best validation loss      & 0.1456                                        \\
     Best validation accuracy  & 96.89\%                                       \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+
+\subsection{\texttt{qwen2.5-coder-1.5b}}
+
+\begin{table}[h]
+  \centering
+  \begin{tabular}{ll}
+    \toprule
+    \textbf{Parameter}        & \textbf{Value}                   \\
+    \midrule
+    HuggingFace ID            & \texttt{Qwen/Qwen2.5-Coder-1.5B} \\
+    LoRA rank ($r$)           & 64                               \\
+    LoRA $\alpha$             & 128                              \\
+    LoRA dropout              & 0.05                             \\
+    Epochs                    & 5                                \\
+    Batch size (per device)   & 16                               \\
+    Gradient accumulation     & 2                                \\
+    Effective batch size      & 32                               \\
+    Learning rate             & 0.0002                           \\
+    Warmup ratio              & 0.05                             \\
+    Max sequence length       & 1024                             \\
+    Load in 4-bit             & No                               \\
+    Load in 8-bit             & No                               \\
+    Total training steps      & 1025                             \\
+    Total training time (min) & 66.3                             \\
+    Final training loss       & 0.0000                           \\
+    Final training accuracy   & 0.00\%                           \\
+    Best validation loss      & {-}{-}{-}                        \\
+    Best validation accuracy  & 0.00\%                           \\
     \bottomrule
   \end{tabular}
 \end{table}

@@ -30,24 +30,24 @@ MODELS_FILE = SCRIPT_DIR / "models.json"
 
 
 def fmt(value, decimals=4):
-    """Format a float, returning '—' if nan/None."""
+    """Format a float, returning a null marker if nan/None."""
     try:
         v = float(value)
         if math.isnan(v):
-            return "---"
+            return "{-}{-}{-}"
         return f"{v:.{decimals}f}"
     except (TypeError, ValueError):
-        return "---"
+        return "{-}{-}{-}"
 
 
 def pct(value, decimals=2):
     try:
         v = float(value)
         if math.isnan(v):
-            return "---"
+            return "{-}{-}{-}"
         return f"{v * 100:.{decimals}f}\\%"
     except (TypeError, ValueError):
-        return "---"
+        return "{-}{-}{-}"
 
 
 def latex_escape(s: str) -> str:
@@ -383,14 +383,21 @@ def make_results_section(results: list[dict]) -> str:
         except (ValueError, TypeError):
             pass
 
+        is_degen = note != ""
+        NA = "{-}{-}{-}"
+
         rows.append(
             rf"        \texttt{{{latex_escape(r['id'])}}}{note} & "
             rf"{fmt(s.get('total_training_minutes'), 1)} & "
             rf"{s.get('total_steps', '---')} & "
-            rf"{fmt(s.get('final_train_loss'), 4)} & "
-            rf"{pct(s.get('final_train_accuracy'))} & "
-            rf"{fmt(s.get('best_eval_loss'), 4)} & "
-            rf"{pct(s.get('best_eval_accuracy'))} \\"
+            + (
+                f"{NA} & {NA} & {NA} & {NA} \\\\"
+                if is_degen
+                else rf"{fmt(s.get('final_train_loss'), 4)} & "
+                rf"{pct(s.get('final_train_accuracy'))} & "
+                rf"{fmt(s.get('best_eval_loss'), 4)} & "
+                rf"{pct(s.get('best_eval_accuracy'))} \\"
+            )
         )
 
     table_body = "\n".join(rows)

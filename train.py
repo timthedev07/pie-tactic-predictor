@@ -37,13 +37,21 @@ from trl import SFTTrainer, SFTConfig
 
 class _CompletionOnlyCollator:
     """Masks loss on prompt tokens so the model only trains on the tactic.
-    Drop-in replacement for the removed DataCollatorForCompletionOnlyLM."""
 
-    def __init__(self, response_template: str, tokenizer):
+    Uses decode-then-re-encode to locate the response boundary, which is
+    robust across all tokenizer families:
+      - BPE/CodeGen (DeepSeek-Coder): no dummy prefix, may have BOS
+      - SentencePiece (CodeLlama/Mistral): add_dummy_prefix adds a leading
+        space marker to the first token of any standalone encoding, but BOS
+        compensation makes the formula n_prompt = len(encode(text)) + has_bos
+      - tiktoken (Qwen2.5-Coder): no dummy prefix, BOS may or may not exist
+    """
+
+    RESPONSE_SEP = "\n### Next tactic\n"
+
+    def __init__(self, tokenizer):
         self.tokenizer = tokenizer
-        self.template_ids = tokenizer.encode(
-            response_template, add_special_tokens=False
-        )
+        self._warned = False
 
     def __call__(self, features: list[dict]) -> dict:
         input_ids = torch.nn.utils.rnn.pad_sequence(
@@ -53,16 +61,44 @@ class _CompletionOnlyCollator:
         )
         attention_mask = (input_ids != self.tokenizer.pad_token_id).long()
         labels = input_ids.clone()
-        tmpl = self.template_ids
-        tlen = len(tmpl)
-        for row in labels:
-            ids = row.tolist()
-            for j in range(len(ids) - tlen + 1):
-                if ids[j : j + tlen] == tmpl:
-                    row[: j + tlen] = -100
-                    break
-            else:
-                row[:] = -100  # template not found — skip sample
+
+        n_failed = 0
+        for i, f in enumerate(features):
+            ids = f["input_ids"]
+            # Decode without special tokens — separator only contains regular chars
+            text = self.tokenizer.decode(ids, skip_special_tokens=True)
+            pos = text.find(self.RESPONSE_SEP)
+            if pos == -1:
+                labels[i] = -100
+                n_failed += 1
+                continue
+            sep_end = pos + len(self.RESPONSE_SEP)
+            # Re-encode the prompt+sep portion to count how many tokens to mask.
+            # For SentencePiece: encode() prepends a dummy-space marker to the
+            # first token (same effect as BOS in the full sequence), so the
+            # counts cancel: mask_len = n_prompt_tokens + int(has_bos).
+            # For tiktoken/BPE: no dummy prefix, same formula holds.
+            n_prompt_tokens = len(
+                self.tokenizer.encode(text[:sep_end], add_special_tokens=False)
+            )
+            has_bos = (
+                self.tokenizer.bos_token_id is not None
+                and len(ids) > 0
+                and ids[0] == self.tokenizer.bos_token_id
+            )
+            mask_len = min(n_prompt_tokens + int(has_bos), len(ids))
+            labels[i, :mask_len] = -100
+
+        if n_failed > 0 and not self._warned:
+            frac = n_failed / len(features)
+            if frac > 0.1:
+                print(
+                    f"[warning] Response separator not found in "
+                    f"{n_failed}/{len(features)} samples ({frac:.0%}). "
+                    "All tokens in those samples are masked."
+                )
+                self._warned = True
+
         # Also mask padding
         labels[input_ids == self.tokenizer.pad_token_id] = -100
         return {
@@ -496,10 +532,7 @@ def train(hf_id: str, hp: dict, args):
     model.print_trainable_parameters()
 
     # Loss masking — train only on the tactic completion
-    collator = _CompletionOnlyCollator(
-        response_template="\n### Next tactic\n",
-        tokenizer=tokenizer,
-    )
+    collator = _CompletionOnlyCollator(tokenizer=tokenizer)
 
     training_args = SFTConfig(
         output_dir=output_dir,

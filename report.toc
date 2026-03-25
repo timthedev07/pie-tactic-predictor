@@ -13,3 +13,4 @@
 \contentsline {subsection}{\numberline {A.2}\texttt {codellama-7b}}{5}{subsection.A.2}%
 \contentsline {subsection}{\numberline {A.3}\texttt {deepseek-coder-1.3b}}{5}{subsection.A.3}%
 \contentsline {subsection}{\numberline {A.4}\texttt {deepseek-coder-6.7b}}{5}{subsection.A.4}%
+\contentsline {subsection}{\numberline {A.5}\texttt {qwen2.5-coder-1.5b}}{5}{subsection.A.5}%
