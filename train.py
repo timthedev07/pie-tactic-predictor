@@ -737,6 +737,31 @@ def test_inference(model, tokenizer, test_rows: list[dict], n: int = 5):
 # ---------------------------------------------------------------------------
 
 
+def is_trained(model_id: str, base_output_dir: str | None = None) -> bool:
+    """
+    Return True if a model appears to have already been successfully trained.
+
+    A run is considered complete when its output directory contains either:
+      - at least one checkpoint-*/adapter_model.safetensors, or
+      - final/adapter_model.safetensors
+
+    A directory that only holds test_rows.jsonl (and nothing else) is treated
+    as untrained.
+    """
+    out_dir = Path(base_output_dir or f"./output/{model_id}")
+    if not out_dir.is_dir():
+        return False
+    # Check for final adapter
+    if (out_dir / "final" / "adapter_model.safetensors").exists():
+        return True
+    # Check for any checkpoint with an adapter
+    for child in out_dir.iterdir():
+        if child.is_dir() and child.name.startswith("checkpoint-"):
+            if (child / "adapter_model.safetensors").exists():
+                return True
+    return False
+
+
 def _run_parallel(args):
     """Spawn one subprocess per model in models.json, capped to n_gpus concurrent jobs."""
     import queue
@@ -749,12 +774,26 @@ def _run_parallel(args):
         print("[parallel] No models found in models.json — nothing to do.")
         return
 
+    # Filter to only untrained models
+    pending, skipped = [], []
+    for m in models:
+        if is_trained(m["id"], args.output_dir):
+            skipped.append(m["id"])
+        else:
+            pending.append(m)
+
+    if skipped:
+        print(f"[parallel] Skipping already-trained model(s): {', '.join(skipped)}")
+    if not pending:
+        print("[parallel] All models are already trained — nothing to do.")
+        return
+
     n_gpus = torch.cuda.device_count()
     if n_gpus == 0:
         print("[parallel] No CUDA GPUs detected — cannot run parallel training.")
         exit(1)
 
-    print(f"\n[parallel] {len(models)} model(s) × {n_gpus} GPU(s) available")
+    print(f"\n[parallel] {len(pending)} model(s) to train × {n_gpus} GPU(s) available")
     print("[parallel] Models will be queued and dispatched as GPUs free up.\n")
 
     gpu_pool: queue.Queue[int] = queue.Queue()
@@ -800,7 +839,7 @@ def _run_parallel(args):
             gpu_pool.put(gpu_idx)
 
     with ThreadPoolExecutor(max_workers=n_gpus) as pool:
-        futures = [pool.submit(launch, m) for m in models]
+        futures = [pool.submit(launch, m) for m in pending]
         for fut in as_completed(futures):
             fut.result()  # re-raise any unexpected exception
 
