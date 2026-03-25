@@ -411,6 +411,7 @@ boundary. These runs are included for completeness.
 \centering
 \caption{{Training run summary (best eval metrics across all checkpoints)}}
 \label{{tab:results}}
+\resizebox{{\textwidth}}{{!}}{{%
 \begin{{tabular}}{{lrrrrrrr}}
 \toprule
 \textbf{{Model}} & \textbf{{Time (min)}} & \textbf{{Steps}} &
@@ -419,7 +420,7 @@ boundary. These runs are included for completeness.
 \midrule
 {table_body}
 \bottomrule
-\end{{tabular}}
+\end{{tabular}}}}
 \end{{table}}
 """
 

@@ -83,13 +83,13 @@ Ten candidate models spanning 1.3B to 34B parameters were evaluated. Table~\ref{
       \textbf{Model ID}            & \textbf{HuggingFace ID}                       & \textbf{LoRA $r$} & \textbf{$\alpha$} & \textbf{Batch} & \textbf{Grad.\ acc.} & \textbf{Eff.\ batch} & \textbf{LR} & \textbf{Epochs} & \textbf{Trained} \\
       \midrule
       \texttt{codellama-13b}       & \texttt{codellama/CodeLlama-13b-hf}           & 32                & 64                & 4              & 8                    & 32                   & 0.0001      & 5               & $\checkmark$     \\
-      \texttt{codellama-34b}       & \texttt{codellama/CodeLlama-34b-hf}           & 16                & 32                & 2              & 16                   & 32                   & 5e-05       & 3               & $\times$         \\
+      \texttt{codellama-34b}       & \texttt{}                                     & ---               & ---               & ---            & ---                  & ?                    & ---         & ---             & $\times$         \\
       \texttt{codellama-7b}        & \texttt{codellama/CodeLlama-7b-hf}            & 32                & 64                & 8              & 4                    & 32                   & 0.0001      & 5               & $\checkmark$     \\
       \texttt{deepseek-coder-1.3b} & \texttt{deepseek-ai/deepseek-coder-1.3b-base} & 64                & 128               & 16             & 2                    & 32                   & 0.0002      & 5               & $\checkmark$     \\
       \texttt{deepseek-coder-6.7b} & \texttt{deepseek-ai/deepseek-coder-6.7b-base} & 32                & 64                & 8              & 4                    & 32                   & 0.0001      & 5               & $\checkmark$     \\
-      \texttt{mistral-7b}          & \texttt{mistralai/Mistral-7B-v0.1}            & 32                & 64                & 8              & 4                    & 32                   & 0.0001      & 5               & $\times$         \\
-      \texttt{phi-2}               & \texttt{microsoft/phi-2}                      & 64                & 128               & 16             & 2                    & 32                   & 0.0002      & 5               & $\times$         \\
-      \texttt{phi-3-mini}          & \texttt{microsoft/Phi-3-mini-4k-instruct}     & 32                & 64                & 8              & 4                    & 32                   & 0.0001      & 5               & $\times$         \\
+      \texttt{mistral-7b}          & \texttt{}                                     & ---               & ---               & ---            & ---                  & ?                    & ---         & ---             & $\times$         \\
+      \texttt{phi-2}               & \texttt{}                                     & ---               & ---               & ---            & ---                  & ?                    & ---         & ---             & $\times$         \\
+      \texttt{phi-3-mini}          & \texttt{}                                     & ---               & ---               & ---            & ---                  & ?                    & ---         & ---             & $\times$         \\
       \texttt{qwen2.5-coder-1.5b}  & \texttt{Qwen/Qwen2.5-Coder-1.5B}              & 64                & 128               & 16             & 2                    & 32                   & 0.0002      & 5               & $\times$         \\
       \texttt{qwen2.5-coder-7b}    & \texttt{Qwen/Qwen2.5-Coder-7B}                & 32                & 64                & 8              & 4                    & 32                   & 0.0001      & 5               & $\times$         \\
       \bottomrule
@@ -112,18 +112,19 @@ boundary. These runs are included for completeness.
   \centering
   \caption{Training run summary (best eval metrics across all checkpoints)}
   \label{tab:results}
-  \begin{tabular}{lrrrrrrr}
-    \toprule
-    \textbf{Model}                                & \textbf{Time (min)}      & \textbf{Steps} &
-    \textbf{Train loss}                           & \textbf{Train acc.}      &
-    \textbf{Best val.\ loss}                      & \textbf{Best val.\ acc.}                                                        \\
-    \midrule
-    \texttt{codellama-13b} \textsuperscript{\dag} & 237.7                    & 1025           & 0.0000 & 0.00\%  & ---    & 0.00\%  \\
-    \texttt{codellama-7b} \textsuperscript{\dag}  & 161.8                    & 1025           & 0.0000 & 0.00\%  & ---    & 0.00\%  \\
-    \texttt{deepseek-coder-1.3b}                  & 71.7                     & 1025           & 0.0112 & 99.38\% & 0.1970 & 95.90\% \\
-    \texttt{deepseek-coder-6.7b}                  & 174.1                    & 1025           & 0.0081 & 99.54\% & 0.1456 & 96.89\% \\
-    \bottomrule
-  \end{tabular}
+  \resizebox{\textwidth}{!}{%
+    \begin{tabular}{lrrrrrrr}
+      \toprule
+      \textbf{Model}                                & \textbf{Time (min)}      & \textbf{Steps} &
+      \textbf{Train loss}                           & \textbf{Train acc.}      &
+      \textbf{Best val.\ loss}                      & \textbf{Best val.\ acc.}                                                        \\
+      \midrule
+      \texttt{codellama-13b} \textsuperscript{\dag} & 237.7                    & 1025           & 0.0000 & 0.00\%  & ---    & 0.00\%  \\
+      \texttt{codellama-7b} \textsuperscript{\dag}  & 161.8                    & 1025           & 0.0000 & 0.00\%  & ---    & 0.00\%  \\
+      \texttt{deepseek-coder-1.3b}                  & 71.7                     & 1025           & 0.0112 & 99.38\% & 0.1970 & 95.90\% \\
+      \texttt{deepseek-coder-6.7b}                  & 174.1                    & 1025           & 0.0081 & 99.54\% & 0.1456 & 96.89\% \\
+      \bottomrule
+    \end{tabular}}
 \end{table}
 
 
