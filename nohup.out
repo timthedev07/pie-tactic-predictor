@@ -5159,3 +5159,100 @@ Done.
   [GPU 3] finished  codellama-13b — done
 
 [parallel] All training jobs complete.
+
+==============================================================
+  model            : Qwen/Qwen2.5-Coder-7B
+  lora_r / alpha   : 32 / 64
+  epochs           : 5
+  lr               : 0.0001
+  batch / accum    : 8 / 4  (effective: 32)
+  quantisation     : none (bf16)
+  output dir       : ./output/qwen2.5-coder-7b
+==============================================================
+
+  Start training? [Y/n]: Traceback (most recent call last):
+  File "/home/timbao/llm-reasoning/pie-tactic-predictor/train.py", line 899, in <module>
+    confirm = input("\n  Start training? [Y/n]: ").strip().lower()
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [Errno 9] Bad file descriptor
+Traceback (most recent call last):
+  File "/home/timbao/llm-reasoning/pie-tactic-predictor/train.py", line 27, in <module>
+    import torch
+ModuleNotFoundError: No module named 'torch'
+`torch_dtype` is deprecated! Use `dtype` instead!
+Cancellation requested; stopping current tasks.
+
+==============================================================
+  model            : Qwen/Qwen2.5-Coder-1.5B
+  lora_r / alpha   : 64 / 128
+  epochs           : 5
+  lr               : 0.0002
+  batch / accum    : 16 / 2  (effective: 32)
+  quantisation     : none (bf16)
+  output dir       : ./output/qwen2.5-coder-1.5b
+==============================================================
+
+==============================================================
+  hf_id    : Qwen/Qwen2.5-Coder-1.5B
+  lora_r   : 64  |  lora_alpha : 128
+  epochs   : 5  |  lr         : 0.0002
+  batch    : 16  |  grad_accum : 2
+  quant    : none (bf16)
+  output   : ./output/qwen2.5-coder-1.5b
+==============================================================
+
+Loading data...
+  train=6535  val=727  test=578
+
+Loading tokeniser...
+Loading model...
+Traceback (most recent call last):
+  File "/home/timbao/miniconda3/envs/vllm-env/lib/python3.11/site-packages/huggingface_hub/file_download.py", line 633, in xet_get
+    download_files(
+KeyboardInterrupt
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/timbao/llm-reasoning/pie-tactic-predictor/train.py", line 918, in <module>
+    trainer, tokenizer, model, test_rows = train(model_entry["hf_id"], hp, args)
+                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/timbao/llm-reasoning/pie-tactic-predictor/train.py", line 480, in train
+    model = load_model(hf_id, hp["load_in_4bit"], hp["load_in_8bit"])
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/timbao/llm-reasoning/pie-tactic-predictor/train.py", line 399, in load_model
+    model = AutoModelForCausalLM.from_pretrained(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/timbao/miniconda3/envs/vllm-env/lib/python3.11/site-packages/transformers/models/auto/auto_factory.py", line 604, in from_pretrained
+    return model_class.from_pretrained(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/timbao/miniconda3/envs/vllm-env/lib/python3.11/site-packages/transformers/modeling_utils.py", line 277, in _wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/timbao/miniconda3/envs/vllm-env/lib/python3.11/site-packages/transformers/modeling_utils.py", line 4900, in from_pretrained
+    checkpoint_files, sharded_metadata = _get_resolved_checkpoint_files(
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/timbao/miniconda3/envs/vllm-env/lib/python3.11/site-packages/transformers/modeling_utils.py", line 1037, in _get_resolved_checkpoint_files
+    resolved_archive_file = cached_file(pretrained_model_name_or_path, filename, **cached_file_kwargs)
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/timbao/miniconda3/envs/vllm-env/lib/python3.11/site-packages/transformers/utils/hub.py", line 322, in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/timbao/miniconda3/envs/vllm-env/lib/python3.11/site-packages/transformers/utils/hub.py", line 479, in cached_files
+    hf_hub_download(
+  File "/home/timbao/miniconda3/envs/vllm-env/lib/python3.11/site-packages/huggingface_hub/utils/_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/timbao/miniconda3/envs/vllm-env/lib/python3.11/site-packages/huggingface_hub/file_download.py", line 1014, in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/timbao/miniconda3/envs/vllm-env/lib/python3.11/site-packages/huggingface_hub/file_download.py", line 1175, in _hf_hub_download_to_cache_dir
+    _download_to_tmp_and_move(
+  File "/home/timbao/miniconda3/envs/vllm-env/lib/python3.11/site-packages/huggingface_hub/file_download.py", line 1727, in _download_to_tmp_and_move
+    xet_get(
+  File "/home/timbao/miniconda3/envs/vllm-env/lib/python3.11/site-packages/huggingface_hub/file_download.py", line 628, in xet_get
+    with progress_cm as progress:
+  File "/home/timbao/miniconda3/envs/vllm-env/lib/python3.11/site-packages/tqdm/std.py", line 1138, in __exit__
+    def __exit__(self, exc_type, exc_value, traceback):
+
+KeyboardInterrupt
