@@ -68,40 +68,6 @@
     }
   },
   {
-    "id": "codellama-34b",
-    "hf_id": "codellama/CodeLlama-34b-hf",
-    "hyperparameters": {
-      "lora_r": 16,
-      "lora_alpha": 32,
-      "lora_dropout": 0.05,
-      "epochs": 3,
-      "batch_size": 2,
-      "grad_accum": 16,
-      "lr": 5e-5,
-      "max_seq_len": 1024,
-      "warmup_ratio": 0.05,
-      "load_in_4bit": false,
-      "load_in_8bit": false
-    }
-  },
-  {
-    "id": "mistral-7b",
-    "hf_id": "mistralai/Mistral-7B-v0.1",
-    "hyperparameters": {
-      "lora_r": 32,
-      "lora_alpha": 64,
-      "lora_dropout": 0.05,
-      "epochs": 5,
-      "batch_size": 8,
-      "grad_accum": 4,
-      "lr": 1e-4,
-      "max_seq_len": 1024,
-      "warmup_ratio": 0.05,
-      "load_in_4bit": false,
-      "load_in_8bit": false
-    }
-  },
-  {
     "id": "qwen2.5-coder-1.5b",
     "hf_id": "Qwen/Qwen2.5-Coder-1.5B",
     "hyperparameters": {
@@ -121,40 +87,6 @@
   {
     "id": "qwen2.5-coder-7b",
     "hf_id": "Qwen/Qwen2.5-Coder-7B",
-    "hyperparameters": {
-      "lora_r": 32,
-      "lora_alpha": 64,
-      "lora_dropout": 0.05,
-      "epochs": 5,
-      "batch_size": 8,
-      "grad_accum": 4,
-      "lr": 1e-4,
-      "max_seq_len": 1024,
-      "warmup_ratio": 0.05,
-      "load_in_4bit": false,
-      "load_in_8bit": false
-    }
-  },
-  {
-    "id": "phi-2",
-    "hf_id": "microsoft/phi-2",
-    "hyperparameters": {
-      "lora_r": 64,
-      "lora_alpha": 128,
-      "lora_dropout": 0.05,
-      "epochs": 5,
-      "batch_size": 16,
-      "grad_accum": 2,
-      "lr": 2e-4,
-      "max_seq_len": 1024,
-      "warmup_ratio": 0.05,
-      "load_in_4bit": false,
-      "load_in_8bit": false
-    }
-  },
-  {
-    "id": "phi-3-mini",
-    "hf_id": "microsoft/Phi-3-mini-4k-instruct",
     "hyperparameters": {
       "lora_r": 32,
       "lora_alpha": 64,
