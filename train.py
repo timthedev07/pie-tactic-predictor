@@ -243,6 +243,18 @@ def parse_args():
         action="store_true",
         help="Skip the interactive confirmation prompt (used internally by --parallel).",
     )
+    parser.add_argument(
+        "--resume",
+        nargs="?",
+        const=True,
+        default=False,
+        metavar="CHECKPOINT_DIR",
+        help=(
+            "Resume training from a checkpoint.\n"
+            "Pass a path to resume from a specific checkpoint, or pass the flag\n"
+            "without a value to auto-detect the latest checkpoint in the output dir."
+        ),
+    )
 
     return parser.parse_args()
 
@@ -535,7 +547,21 @@ def train(hf_id: str, hp: dict, args):
 
     print("\nTraining...\n")
     t0 = time.time()
-    trainer.train()
+
+    resume_from = None
+    if args.resume:
+        if isinstance(args.resume, str):
+            # Explicit checkpoint path supplied
+            resume_from = args.resume
+        else:
+            # Auto-detect latest checkpoint in output dir
+            resume_from = find_latest_checkpoint(output_dir)
+        if resume_from:
+            print(f"  Resuming from checkpoint: {resume_from}\n")
+        else:
+            print("  --resume set but no checkpoint found — starting from scratch.\n")
+
+    trainer.train(resume_from_checkpoint=resume_from)
     total_training_seconds = time.time() - t0
 
     final_path = os.path.join(output_dir, "final")
@@ -739,27 +765,35 @@ def test_inference(model, tokenizer, test_rows: list[dict], n: int = 5):
 
 def is_trained(model_id: str, base_output_dir: str | None = None) -> bool:
     """
-    Return True if a model appears to have already been successfully trained.
-
-    A run is considered complete when its output directory contains either:
-      - at least one checkpoint-*/adapter_model.safetensors, or
-      - final/adapter_model.safetensors
-
-    A directory that only holds test_rows.jsonl (and nothing else) is treated
-    as untrained.
+    Return True only if training completed fully (final/adapter_model.safetensors
+    exists). A crashed run with checkpoints but no final/ returns False so that
+    --parallel will pick it back up and resume it.
     """
     out_dir = Path(base_output_dir or f"./output/{model_id}")
-    if not out_dir.is_dir():
-        return False
-    # Check for final adapter
-    if (out_dir / "final" / "adapter_model.safetensors").exists():
-        return True
-    # Check for any checkpoint with an adapter
-    for child in out_dir.iterdir():
+    return (out_dir / "final" / "adapter_model.safetensors").exists()
+
+
+def find_latest_checkpoint(output_dir: str) -> str | None:
+    """
+    Return the path of the highest-numbered checkpoint-N directory that
+    contains a valid adapter, or None if no such checkpoint exists.
+    """
+    out = Path(output_dir)
+    checkpoints = []
+    if not out.is_dir():
+        return None
+    for child in out.iterdir():
         if child.is_dir() and child.name.startswith("checkpoint-"):
             if (child / "adapter_model.safetensors").exists():
-                return True
-    return False
+                try:
+                    step = int(child.name.split("-")[1])
+                    checkpoints.append((step, child))
+                except (IndexError, ValueError):
+                    pass
+    if not checkpoints:
+        return None
+    _, latest = max(checkpoints, key=lambda x: x[0])
+    return str(latest)
 
 
 def _run_parallel(args):
@@ -806,6 +840,9 @@ def _run_parallel(args):
             env = os.environ.copy()
             env["CUDA_VISIBLE_DEVICES"] = str(gpu_idx)
 
+            out_dir = args.output_dir or f"./output/{model_entry['id']}"
+            latest_ckpt = find_latest_checkpoint(out_dir)
+
             cmd = [
                 sys.executable,
                 __file__,
@@ -827,8 +864,17 @@ def _run_parallel(args):
                 cmd.append("--load-in-4bit")
             if args.load_in_8bit:
                 cmd.append("--load-in-8bit")
+            if latest_ckpt:
+                cmd += ["--resume", latest_ckpt]
+            elif args.resume:
+                # propagate explicit --resume if set at the parallel level
+                if isinstance(args.resume, str):
+                    cmd += ["--resume", args.resume]
+                else:
+                    cmd.append("--resume")
 
-            print(f"  [GPU {gpu_idx}] starting  {model_entry['id']}")
+            action = f"resuming from {latest_ckpt}" if latest_ckpt else "starting fresh"
+            print(f"  [GPU {gpu_idx}] {model_entry['id']} — {action}")
             proc = subprocess.Popen(cmd, env=env)
             proc.wait()
             rc = proc.returncode
@@ -901,6 +947,14 @@ if __name__ == "__main__":
         f"  quantisation     : {'4-bit' if hp['load_in_4bit'] else '8-bit' if hp['load_in_8bit'] else 'none (bf16)'}"
     )
     print(f"  output dir       : {args.output_dir or './output/' + args.model_id}")
+    if args.resume:
+        _out = args.output_dir or f"./output/{args.model_id}"
+        _ckpt = (
+            args.resume
+            if isinstance(args.resume, str)
+            else find_latest_checkpoint(_out)
+        )
+        print(f"  resume from      : {_ckpt or '(auto — no checkpoint found yet)'}")
     print(f"{'='*62}")
 
     if not args.yes:
