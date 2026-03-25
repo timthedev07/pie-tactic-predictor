@@ -859,6 +859,14 @@ if __name__ == "__main__":
 
     # Resolve which model to use
     if args.model is None:
+        import sys
+
+        if not sys.stdin.isatty():
+            print(
+                "[error] --model must be specified when running non-interactively "
+                "(e.g. under nohup). Use --model <id> or --parallel."
+            )
+            exit(1)
         model_entry = pick_model_interactively(models)
     else:
         model_entry = find_model(models, args.model)
@@ -896,10 +904,16 @@ if __name__ == "__main__":
     print(f"{'='*62}")
 
     if not args.yes:
-        confirm = input("\n  Start training? [Y/n]: ").strip().lower()
-        if confirm not in ("", "y", "yes"):
-            print("  Aborted.")
-            exit(0)
+        import sys
+
+        if not sys.stdin.isatty():
+            # Running under nohup / backgrounded — treat as confirmed
+            print("  (non-interactive stdin detected — auto-confirming)")
+        else:
+            confirm = input("\n  Start training? [Y/n]: ").strip().lower()
+            if confirm not in ("", "y", "yes"):
+                print("  Aborted.")
+                exit(0)
 
     trainer, tokenizer, model, test_rows = train(model_entry["hf_id"], hp, args)
     test_inference(model, tokenizer, test_rows, n=5)
