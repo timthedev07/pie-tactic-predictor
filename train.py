@@ -619,6 +619,7 @@ def train(hf_id: str, hp: dict, args):
         bf16=torch.cuda.is_bf16_supported(),
         fp16=not torch.cuda.is_bf16_supported(),
         gradient_checkpointing=True,
+        gradient_checkpointing_kwargs={"use_reentrant": False},
         optim=(
             "paged_adamw_8bit"
             if (hp["load_in_4bit"] or hp["load_in_8bit"])
@@ -630,7 +631,7 @@ def train(hf_id: str, hp: dict, args):
 
     trainer = Trainer(
         model=model,
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         train_dataset=train_ds,
         eval_dataset=val_ds,
         data_collator=collator,
