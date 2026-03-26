@@ -22,7 +22,11 @@ import time
 from pathlib import Path
 
 # Use fast local storage for model downloads instead of the default ~/.cache
-os.environ.setdefault("HF_HOME", "/localhome/timbao/.cache/huggingface")
+_ssh_host = os.environ.get("SSH_CONNECTION", "") + os.environ.get("HOSTNAME", "")
+if any(h in _ssh_host for h in ("twinkle2", "twinkle3")):
+    os.environ.setdefault("HF_HOME", "/localhome/timbao/.cache/huggingface")
+else:
+    os.environ.setdefault("HF_HOME", os.path.expanduser("~/.cache/huggingface/hub"))
 
 import torch
 from datasets import Dataset
@@ -36,66 +40,42 @@ from trl import SFTTrainer, SFTConfig
 
 
 class _CompletionOnlyCollator:
-    def __init__(self, tokenizer, anchors=None, debug=False):
+    """Masks prompt tokens so the model only trains on the tactic completion.
+
+    Each feature must contain ``input_ids`` (list[int]) and ``prompt_length``
+    (int).  Tokens at positions < prompt_length are masked with -100 so they
+    do not contribute to the loss.
+
+    This replaces the previous token-ID-scanning approach which broke when
+    TRL's SFTTrainer pre-tokenised the dataset (or applied a chat template),
+    producing token sequences where the separator pattern could not be found.
+    """
+
+    def __init__(self, tokenizer):
         self.tokenizer = tokenizer
-        self.debug = debug
-        if anchors is None:
-            anchors = ["", " ", "\n", "A", "▁"]
-        self.anchors = anchors
 
-    def _sep_candidates(self, sep: str) -> list[list[int]]:
-        candidates = []
-        for a in self.anchors:
-            enc_a = self.tokenizer(a, add_special_tokens=False).input_ids
-            enc_a_sep = self.tokenizer(a + sep, add_special_tokens=False).input_ids
-            if len(enc_a_sep) > len(enc_a):
-                candidates.append(enc_a_sep[len(enc_a) :])
-        # also include direct encoding of sep (fallback)
-        direct = self.tokenizer(sep, add_special_tokens=False).input_ids
-        if direct and all(direct != c for c in candidates):
-            candidates.append(direct)
-        return candidates
+    def __call__(self, features: list[dict]) -> dict:
+        input_id_lists = [f["input_ids"] for f in features]
+        prompt_lengths = [f["prompt_length"] for f in features]
 
-    def __call__(self, batch):
-        texts = [b["text"] for b in batch]
-        inputs = self.tokenizer(
-            texts, return_tensors="pt", padding=True, truncation=True
+        input_ids = torch.nn.utils.rnn.pad_sequence(
+            [torch.tensor(ids) for ids in input_id_lists],
+            batch_first=True,
+            padding_value=self.tokenizer.pad_token_id,
         )
-        input_ids = inputs["input_ids"].tolist()
-        sep = "\n### Next tactic\n"
-        sep_candidates = self._sep_candidates(sep)
+        attention_mask = (input_ids != self.tokenizer.pad_token_id).long()
+        labels = input_ids.clone()
 
-        labels = []
-        for i, ids in enumerate(input_ids):
-            mask = [0] * len(ids)
-            found = False
-            for cand in sep_candidates:
-                L = len(cand)
-                if L == 0:
-                    continue
-                for j in range(len(ids) - L + 1):
-                    if ids[j : j + L] == cand:
-                        # mask prompt (everything before the sep start)
-                        for k in range(j):
-                            mask[k] = -100
-                        found = True
-                        break
-                if found:
-                    break
-            if not found:
-                # If not found, default: do NOT mask anything (safer), or mask all prompt tokens?
-                if self.debug:
-                    print("WARNING: sep not found for example", i)
-                # keep mask as zeros -> train on entire sequence
-            # convert mask to label ids (-100 wherever masked)
-            lbl = [-100 if m == -100 else ids[idx] for idx, m in enumerate(mask)]
-            labels.append(lbl)
+        for i, plen in enumerate(prompt_lengths):
+            labels[i, :plen] = -100
 
-        inputs["labels"] = torch.tensor(
-            [l + [-100] * (inputs["input_ids"].shape[1] - len(l)) for l in labels],
-            dtype=torch.long,
-        )
-        return inputs
+        # Also mask padding
+        labels[input_ids == self.tokenizer.pad_token_id] = -100
+        return {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "labels": labels,
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -364,15 +344,19 @@ def format_local_context(entries: list[dict]) -> str:
     return "  ".join(f"{e['name']} : {e['type'].strip()}" for e in entries)
 
 
-def row_to_text(row: dict) -> str:
-    prompt = PROMPT_TEMPLATE.format(
+def row_to_prompt(row: dict) -> str:
+    """Return just the prompt (everything up to and including the separator)."""
+    return PROMPT_TEMPLATE.format(
         theorem_name=row["theoremName"],
         theorem_type=row["theoremType"].strip(),
         global_context=format_global_context(row["globalContext"]),
         local_context=format_local_context(row["localContext"]),
         goal=row["goal"].strip(),
     )
-    return prompt + row["tactic"].strip()
+
+
+def row_to_text(row: dict) -> str:
+    return row_to_prompt(row) + row["tactic"].strip()
 
 
 def load_jsonl(path: str) -> list[dict]:
@@ -417,8 +401,31 @@ def split_by_proof(
     return train, val, test
 
 
-def make_hf_dataset(rows: list[dict]) -> Dataset:
-    return Dataset.from_dict({"text": [row_to_text(r) for r in rows]})
+def make_hf_dataset(rows: list[dict], tokenizer, max_seq_len: int) -> Dataset:
+    """Pre-tokenise rows and record how many tokens belong to the prompt.
+
+    Because the prompt template ends with a newline and BPE pre-tokenisers
+    split on newlines, ``tokenize(prompt + tactic)[:n]`` equals
+    ``tokenize(prompt)`` — so the prompt token count is an accurate mask
+    boundary.  This is immune to tokeniser quirks that broke the previous
+    token-ID-scanning approach.
+    """
+    all_input_ids: list[list[int]] = []
+    all_prompt_lengths: list[int] = []
+    for r in rows:
+        prompt = row_to_prompt(r)
+        text = prompt + r["tactic"].strip()
+        full_enc = tokenizer(
+            text, add_special_tokens=True, truncation=True, max_length=max_seq_len
+        )
+        prompt_enc = tokenizer(
+            prompt, add_special_tokens=True, truncation=True, max_length=max_seq_len
+        )
+        all_input_ids.append(full_enc["input_ids"])
+        all_prompt_lengths.append(len(prompt_enc["input_ids"]))
+    return Dataset.from_dict(
+        {"input_ids": all_input_ids, "prompt_length": all_prompt_lengths}
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -529,18 +536,19 @@ def train(hf_id: str, hp: dict, args):
         val_rows = rng.sample(val_rows, min(n, len(val_rows)))
     print(f"  train={len(train_rows)}  val={len(val_rows)}  test={len(test_rows)}")
 
-    train_ds = make_hf_dataset(train_rows)
-    val_ds = make_hf_dataset(val_rows)
+    # Tokeniser (needed before dataset creation for pre-tokenisation)
+    print("\nLoading tokeniser...")
+    tokenizer = load_tokeniser(hf_id)
+
+    train_ds = make_hf_dataset(train_rows, tokenizer, hp["max_seq_len"])
+    val_ds = make_hf_dataset(val_rows, tokenizer, hp["max_seq_len"])
 
     test_path = os.path.join(output_dir, "test_rows.jsonl")
     with open(test_path, "w") as f:
         for r in test_rows:
             f.write(json.dumps(r) + "\n")
 
-    # Tokeniser + model
-    print("\nLoading tokeniser...")
-    tokenizer = load_tokeniser(hf_id)
-
+    # Model
     print("Loading model...")
     model = load_model(hf_id, hp["load_in_4bit"], hp["load_in_8bit"])
 
@@ -572,7 +580,7 @@ def train(hf_id: str, hp: dict, args):
     training_args = SFTConfig(
         output_dir=output_dir,
         max_length=hp["max_seq_len"],
-        dataset_text_field="text",
+        remove_unused_columns=False,
         num_train_epochs=_num_epochs,
         per_device_train_batch_size=hp["batch_size"],
         per_device_eval_batch_size=hp["batch_size"],
