@@ -1,2 +1,0 @@
-hf_id,total_training_seconds,total_training_minutes,total_steps,total_epochs,train_samples,val_samples,final_train_loss,final_train_accuracy,best_eval_loss,best_eval_accuracy,lora_r,lora_alpha,batch_size,grad_accum,effective_batch_size,lr,epochs_config,max_seq_len
-Qwen/Qwen2.5-Coder-7B,232.9,3.88,1,1.0,10,10,3.011,0.43344156444072723,2.9220571517944336,0.39000000059604645,32,64,8,4,32,0.0001,5,1024
