@@ -35,20 +35,22 @@ from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     BitsAndBytesConfig,
+    Trainer,
+    TrainingArguments,
 )
-from trl import SFTTrainer, SFTConfig
 
 
 class _CompletionOnlyCollator:
     """Masks prompt tokens so the model only trains on the tactic completion.
 
-    Each feature must contain ``input_ids`` (list[int]) and ``prompt_length``
-    (int).  Tokens at positions < prompt_length are masked with -100 so they
-    do not contribute to the loss.
+    Each feature must contain ``input_ids`` (list[int]), ``prompt_length``
+    (int), and ``seq_length`` (int — the *un-padded* token count).  Tokens at
+    positions < prompt_length are masked with -100 so they do not contribute
+    to the loss, and positions >= seq_length (i.e. padding) are also masked.
 
-    This replaces the previous token-ID-scanning approach which broke when
-    TRL's SFTTrainer pre-tokenised the dataset (or applied a chat template),
-    producing token sequences where the separator pattern could not be found.
+    Using an explicit ``seq_length`` instead of scanning for ``pad_token_id``
+    avoids silently masking real tokens when ``pad_token_id == eos_token_id``
+    (which is the common fallback for models that lack a native pad token).
     """
 
     def __init__(self, tokenizer):
@@ -57,20 +59,23 @@ class _CompletionOnlyCollator:
     def __call__(self, features: list[dict]) -> dict:
         input_id_lists = [f["input_ids"] for f in features]
         prompt_lengths = [f["prompt_length"] for f in features]
+        seq_lengths = [f["seq_length"] for f in features]
 
         input_ids = torch.nn.utils.rnn.pad_sequence(
             [torch.tensor(ids) for ids in input_id_lists],
             batch_first=True,
             padding_value=self.tokenizer.pad_token_id,
         )
-        attention_mask = (input_ids != self.tokenizer.pad_token_id).long()
+        attention_mask = torch.zeros_like(input_ids)
+        for i, slen in enumerate(seq_lengths):
+            attention_mask[i, :slen] = 1
+
         labels = input_ids.clone()
 
-        for i, plen in enumerate(prompt_lengths):
-            labels[i, :plen] = -100
+        for i, (plen, slen) in enumerate(zip(prompt_lengths, seq_lengths)):
+            labels[i, :plen] = -100  # mask prompt
+            labels[i, slen:] = -100  # mask padding
 
-        # Also mask padding
-        labels[input_ids == self.tokenizer.pad_token_id] = -100
         return {
             "input_ids": input_ids,
             "attention_mask": attention_mask,
@@ -409,9 +414,18 @@ def make_hf_dataset(rows: list[dict], tokenizer, max_seq_len: int) -> Dataset:
     ``tokenize(prompt)`` — so the prompt token count is an accurate mask
     boundary.  This is immune to tokeniser quirks that broke the previous
     token-ID-scanning approach.
+
+    Each sample stores:
+    - ``input_ids``: the full tokenised sequence (prompt + tactic)
+    - ``prompt_length``: number of tokens belonging to the prompt
+    - ``seq_length``: total un-padded token count (used by the collator to
+      distinguish real tokens from padding without relying on pad_token_id,
+      which may equal eos_token_id)
     """
     all_input_ids: list[list[int]] = []
     all_prompt_lengths: list[int] = []
+    all_seq_lengths: list[int] = []
+    n_fully_masked = 0
     for r in rows:
         prompt = row_to_prompt(r)
         text = prompt + r["tactic"].strip()
@@ -421,10 +435,27 @@ def make_hf_dataset(rows: list[dict], tokenizer, max_seq_len: int) -> Dataset:
         prompt_enc = tokenizer(
             prompt, add_special_tokens=True, truncation=True, max_length=max_seq_len
         )
-        all_input_ids.append(full_enc["input_ids"])
-        all_prompt_lengths.append(len(prompt_enc["input_ids"]))
+        full_ids = full_enc["input_ids"]
+        plen = len(prompt_enc["input_ids"])
+        if plen >= len(full_ids):
+            n_fully_masked += 1
+        all_input_ids.append(full_ids)
+        all_prompt_lengths.append(plen)
+        all_seq_lengths.append(len(full_ids))
+
+    if n_fully_masked:
+        print(
+            f"  WARNING: {n_fully_masked}/{len(rows)} samples have "
+            f"prompt_length >= seq_length (completion tokens truncated away). "
+            f"Consider increasing --max-seq-len."
+        )
+
     return Dataset.from_dict(
-        {"input_ids": all_input_ids, "prompt_length": all_prompt_lengths}
+        {
+            "input_ids": all_input_ids,
+            "prompt_length": all_prompt_lengths,
+            "seq_length": all_seq_lengths,
+        }
     )
 
 
@@ -577,9 +608,8 @@ def train(hf_id: str, hp: dict, args):
         _save_limit = 3
         _warmup = hp["warmup_ratio"]
 
-    training_args = SFTConfig(
+    training_args = TrainingArguments(
         output_dir=output_dir,
-        max_length=hp["max_seq_len"],
         remove_unused_columns=False,
         num_train_epochs=_num_epochs,
         per_device_train_batch_size=hp["batch_size"],
@@ -612,9 +642,9 @@ def train(hf_id: str, hp: dict, args):
         data_seed=args.seed,
     )
 
-    trainer = SFTTrainer(
+    trainer = Trainer(
         model=model,
-        processing_class=tokenizer,
+        tokenizer=tokenizer,
         train_dataset=train_ds,
         eval_dataset=val_ds,
         data_collator=collator,
