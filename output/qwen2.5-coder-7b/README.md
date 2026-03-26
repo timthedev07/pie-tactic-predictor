@@ -1,17 +1,17 @@
 ---
-base_model: Qwen/Qwen2.5-Coder-1.5B
+base_model: Qwen/Qwen2.5-Coder-7B
 library_name: transformers
-model_name: qwen2.5-coder-1.5b
+model_name: qwen2.5-coder-7b
 tags:
 - generated_from_trainer
-- sft
 - trl
+- sft
 licence: license
 ---
 
-# Model Card for qwen2.5-coder-1.5b
+# Model Card for qwen2.5-coder-7b
 
-This model is a fine-tuned version of [Qwen/Qwen2.5-Coder-1.5B](https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B).
+This model is a fine-tuned version of [Qwen/Qwen2.5-Coder-7B](https://huggingface.co/Qwen/Qwen2.5-Coder-7B).
 It has been trained using [TRL](https://github.com/huggingface/trl).
 
 ## Quick start
