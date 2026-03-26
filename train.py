@@ -291,6 +291,19 @@ def parse_args():
             "without a value to auto-detect the latest checkpoint in the output dir."
         ),
     )
+    parser.add_argument(
+        "--smoke-test",
+        nargs="?",
+        const=10,
+        default=None,
+        type=int,
+        metavar="N",
+        help=(
+            "Quick pipeline sanity check: train on N samples (default: 10) for\n"
+            "1 epoch to verify the full train/eval/save path works.\n"
+            "Output goes to output/{model_id}-smoke-test/ unless --output-dir is set."
+        ),
+    )
 
     return parser.parse_args()
 
@@ -490,13 +503,18 @@ def make_lora_config(hp: dict) -> LoraConfig:
 
 
 def train(hf_id: str, hp: dict, args):
-    output_dir = args.output_dir or f"./output/{args.model_id}"
+    _smoke = args.smoke_test is not None
+    output_dir = args.output_dir or (
+        f"./output/{args.model_id}-smoke-test" if _smoke else f"./output/{args.model_id}"
+    )
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
     print(f"\n{'='*62}")
+    if _smoke:
+        print(f"  *** SMOKE TEST ({args.smoke_test} samples) ***")
     print(f"  hf_id    : {hf_id}")
     print(f"  lora_r   : {hp['lora_r']}  |  lora_alpha : {hp['lora_alpha']}")
-    print(f"  epochs   : {hp['epochs']}  |  lr         : {hp['lr']}")
+    print(f"  epochs   : {'1 (smoke)' if _smoke else hp['epochs']}  |  lr         : {hp['lr']}")
     print(f"  batch    : {hp['batch_size']}  |  grad_accum : {hp['grad_accum']}")
     print(
         f"  quant    : {'4-bit' if hp['load_in_4bit'] else '8-bit' if hp['load_in_8bit'] else 'none (bf16)'}"
@@ -510,6 +528,11 @@ def train(hf_id: str, hp: dict, args):
     train_rows, val_rows, test_rows = split_by_proof(
         rows, args.val_split, args.test_split, args.seed
     )
+    if _smoke:
+        n = args.smoke_test
+        rng = random.Random(args.seed)
+        train_rows = rng.sample(train_rows, min(n, len(train_rows)))
+        val_rows = rng.sample(val_rows, min(n, len(val_rows)))
     print(f"  train={len(train_rows)}  val={len(val_rows)}  test={len(test_rows)}")
 
     train_ds = make_hf_dataset(train_rows)
@@ -534,28 +557,46 @@ def train(hf_id: str, hp: dict, args):
     # Loss masking — train only on the tactic completion
     collator = _CompletionOnlyCollator(tokenizer=tokenizer)
 
+    # For smoke tests, collapse everything into 1 epoch with tiny step counts
+    # so the entire train→eval→save path is exercised quickly.
+    if _smoke:
+        _num_epochs = 1
+        _steps_per_epoch = max(1, len(train_rows) // hp["batch_size"])
+        _eval_steps = _steps_per_epoch
+        _save_steps = _steps_per_epoch
+        _log_steps = 1
+        _save_limit = 1
+        _warmup = 0.0
+    else:
+        _num_epochs = hp["epochs"]
+        _eval_steps = 100
+        _save_steps = 100
+        _log_steps = 20
+        _save_limit = 3
+        _warmup = hp["warmup_ratio"]
+
     training_args = SFTConfig(
         output_dir=output_dir,
         max_length=hp["max_seq_len"],
         dataset_text_field="text",
-        num_train_epochs=hp["epochs"],
+        num_train_epochs=_num_epochs,
         per_device_train_batch_size=hp["batch_size"],
         per_device_eval_batch_size=hp["batch_size"],
         gradient_accumulation_steps=hp["grad_accum"],
         learning_rate=hp["lr"],
         lr_scheduler_type="cosine",
-        warmup_ratio=hp["warmup_ratio"],
+        warmup_ratio=_warmup,
         weight_decay=0.01,
         eval_strategy="steps",
-        eval_steps=100,
+        eval_steps=_eval_steps,
         save_strategy="steps",
-        save_steps=100,
-        save_total_limit=3,
+        save_steps=_save_steps,
+        save_total_limit=_save_limit,
         load_best_model_at_end=True,
         metric_for_best_model="eval_loss",
         greater_is_better=False,
         logging_dir=os.path.join(output_dir, "logs"),
-        logging_steps=20,
+        logging_steps=_log_steps,
         report_to="none",
         bf16=torch.cuda.is_bf16_supported(),
         fp16=not torch.cuda.is_bf16_supported(),
@@ -893,6 +934,8 @@ def _run_parallel(args):
             ]
             if args.output_dir:
                 cmd += ["--output-dir", args.output_dir]
+            if args.smoke_test is not None:
+                cmd += ["--smoke-test", str(args.smoke_test)]
             if args.load_in_4bit:
                 cmd.append("--load-in-4bit")
             if args.load_in_8bit:
@@ -980,6 +1023,9 @@ if __name__ == "__main__":
         f"  quantisation     : {'4-bit' if hp['load_in_4bit'] else '8-bit' if hp['load_in_8bit'] else 'none (bf16)'}"
     )
     print(f"  output dir       : {args.output_dir or './output/' + args.model_id}")
+    if args.smoke_test is not None:
+        _smoke_dir = args.output_dir or f"./output/{args.model_id}-smoke-test"
+        print(f"  smoke test       : {args.smoke_test} samples — writes to {_smoke_dir}")
     if args.resume:
         _out = args.output_dir or f"./output/{args.model_id}"
         _ckpt = (
