@@ -505,7 +505,9 @@ def make_lora_config(hp: dict) -> LoraConfig:
 def train(hf_id: str, hp: dict, args):
     _smoke = args.smoke_test is not None
     output_dir = args.output_dir or (
-        f"./output/{args.model_id}-smoke-test" if _smoke else f"./output/{args.model_id}"
+        f"./output/{args.model_id}-smoke-test"
+        if _smoke
+        else f"./output/{args.model_id}"
     )
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
@@ -514,7 +516,9 @@ def train(hf_id: str, hp: dict, args):
         print(f"  *** SMOKE TEST ({args.smoke_test} samples) ***")
     print(f"  hf_id    : {hf_id}")
     print(f"  lora_r   : {hp['lora_r']}  |  lora_alpha : {hp['lora_alpha']}")
-    print(f"  epochs   : {'1 (smoke)' if _smoke else hp['epochs']}  |  lr         : {hp['lr']}")
+    print(
+        f"  epochs   : {'1 (smoke)' if _smoke else hp['epochs']}  |  lr         : {hp['lr']}"
+    )
     print(f"  batch    : {hp['batch_size']}  |  grad_accum : {hp['grad_accum']}")
     print(
         f"  quant    : {'4-bit' if hp['load_in_4bit'] else '8-bit' if hp['load_in_8bit'] else 'none (bf16)'}"
@@ -1025,7 +1029,9 @@ if __name__ == "__main__":
     print(f"  output dir       : {args.output_dir or './output/' + args.model_id}")
     if args.smoke_test is not None:
         _smoke_dir = args.output_dir or f"./output/{args.model_id}-smoke-test"
-        print(f"  smoke test       : {args.smoke_test} samples — writes to {_smoke_dir}")
+        print(
+            f"  smoke test       : {args.smoke_test} samples — writes to {_smoke_dir}"
+        )
     if args.resume:
         _out = args.output_dir or f"./output/{args.model_id}"
         _ckpt = (
