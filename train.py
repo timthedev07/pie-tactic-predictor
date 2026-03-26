@@ -36,87 +36,66 @@ from trl import SFTTrainer, SFTConfig
 
 
 class _CompletionOnlyCollator:
-    """Masks loss on prompt tokens so the model only trains on the tactic.
-
-    Finds the response boundary by encoding the separator in mid-sequence
-    context (prefixed with a single-character anchor) to obtain the exact
-    token IDs that appear inside a training sequence.  This avoids two
-    failure modes of simpler approaches:
-
-    1. Standalone encoding (original bug): SentencePiece's add_dummy_prefix
-       inserts a spurious leading-space token at position 0 of any isolated
-       encode() call, producing token IDs that differ from those in the full
-       sequence.
-
-    2. Decode-then-find (previous attempt): SentencePiece decodes the
-       word-initial ▁ marker as a literal space, so "\n###" round-trips as
-       "\n ###", and text.find(RESPONSE_SEP) always returns -1.
-
-    The context-prefix trick: encode("A" + RESPONSE_SEP) and encode("A"),
-    then sep_ids = combined[len(prefix):].  "A" at position 0 absorbs the
-    dummy-prefix artifact, and the remaining tokens are exactly what would
-    appear mid-sequence.  Works for BPE, tiktoken, and SentencePiece.
-    """
-
-    RESPONSE_SEP = "\n### Next tactic\n"
-
-    def __init__(self, tokenizer):
+    def __init__(self, tokenizer, anchors=None, debug=False):
         self.tokenizer = tokenizer
-        self._warned = False
+        self.debug = debug
+        if anchors is None:
+            anchors = ["", " ", "\n", "A", "▁"]
+        self.anchors = anchors
 
-        # Compute exact mid-sequence token IDs for the separator once at init.
-        prefix_ids = tokenizer.encode("A", add_special_tokens=False)
-        combined_ids = tokenizer.encode(
-            "A" + self.RESPONSE_SEP, add_special_tokens=False
+    def _sep_candidates(self, sep: str) -> list[list[int]]:
+        candidates = []
+        for a in self.anchors:
+            enc_a = self.tokenizer(a, add_special_tokens=False).input_ids
+            enc_a_sep = self.tokenizer(a + sep, add_special_tokens=False).input_ids
+            if len(enc_a_sep) > len(enc_a):
+                candidates.append(enc_a_sep[len(enc_a) :])
+        # also include direct encoding of sep (fallback)
+        direct = self.tokenizer(sep, add_special_tokens=False).input_ids
+        if direct and all(direct != c for c in candidates):
+            candidates.append(direct)
+        return candidates
+
+    def __call__(self, batch):
+        texts = [b["text"] for b in batch]
+        inputs = self.tokenizer(
+            texts, return_tensors="pt", padding=True, truncation=True
         )
-        self.sep_ids: list[int] = combined_ids[len(prefix_ids) :]
-        self._sep_len = len(self.sep_ids)
-        if self._sep_len == 0:
-            raise ValueError(
-                "RESPONSE_SEP tokenised to zero tokens — check the separator string."
-            )
+        input_ids = inputs["input_ids"].tolist()
+        sep = "\n### Next tactic\n"
+        sep_candidates = self._sep_candidates(sep)
 
-    def __call__(self, features: list[dict]) -> dict:
-        input_ids = torch.nn.utils.rnn.pad_sequence(
-            [torch.tensor(f["input_ids"]) for f in features],
-            batch_first=True,
-            padding_value=self.tokenizer.pad_token_id,
-        )
-        attention_mask = (input_ids != self.tokenizer.pad_token_id).long()
-        labels = input_ids.clone()
-
-        tmpl = self.sep_ids
-        tlen = self._sep_len
-        n_failed = 0
-        for i, f in enumerate(features):
-            ids = list(f["input_ids"])  # plain list for slice comparison
+        labels = []
+        for i, ids in enumerate(input_ids):
+            mask = [0] * len(ids)
             found = False
-            for j in range(len(ids) - tlen + 1):
-                if ids[j : j + tlen] == tmpl:
-                    labels[i, : j + tlen] = -100
-                    found = True
+            for cand in sep_candidates:
+                L = len(cand)
+                if L == 0:
+                    continue
+                for j in range(len(ids) - L + 1):
+                    if ids[j : j + L] == cand:
+                        # mask prompt (everything before the sep start)
+                        for k in range(j):
+                            mask[k] = -100
+                        found = True
+                        break
+                if found:
                     break
             if not found:
-                labels[i] = -100
-                n_failed += 1
+                # If not found, default: do NOT mask anything (safer), or mask all prompt tokens?
+                if self.debug:
+                    print("WARNING: sep not found for example", i)
+                # keep mask as zeros -> train on entire sequence
+            # convert mask to label ids (-100 wherever masked)
+            lbl = [-100 if m == -100 else ids[idx] for idx, m in enumerate(mask)]
+            labels.append(lbl)
 
-        if n_failed > 0 and not self._warned:
-            frac = n_failed / len(features)
-            if frac > 0.1:
-                print(
-                    f"[warning] Response separator not found in "
-                    f"{n_failed}/{len(features)} samples ({frac:.0%}). "
-                    "All tokens in those samples are masked."
-                )
-                self._warned = True
-
-        # Also mask padding
-        labels[input_ids == self.tokenizer.pad_token_id] = -100
-        return {
-            "input_ids": input_ids,
-            "attention_mask": attention_mask,
-            "labels": labels,
-        }
+        inputs["labels"] = torch.tensor(
+            [l + [-100] * (inputs["input_ids"].shape[1] - len(l)) for l in labels],
+            dtype=torch.long,
+        )
+        return inputs
 
 
 # ---------------------------------------------------------------------------
