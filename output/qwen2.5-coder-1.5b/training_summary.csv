@@ -1,3 +1,2 @@
 hf_id,total_training_seconds,total_training_minutes,total_steps,total_epochs,train_samples,val_samples,final_train_loss,final_train_accuracy,best_eval_loss,best_eval_accuracy,lora_r,lora_alpha,batch_size,grad_accum,effective_batch_size,lr,epochs_config,max_seq_len
-Qwen/Qwen2.5-Coder-1.5B,3975.4,66.26,1025,5.0,6535,727,0.0,0.0,nan,0.0,64,128,16,2,32,0.0002,5,1024
 Qwen/Qwen2.5-Coder-1.5B,4003.0,66.72,1025,5.0,6535,727,0.0106,0.9941537722945213,0.2559288740158081,0.9488505047300587,64,128,16,2,32,0.0002,5,1024
