@@ -1,18 +1,3 @@
-"""
-Pie Tactic Prediction — Fine-tuning Script
-==========================================
-Usage:
-    python finetune.py                              # interactive picker, loads hyperparams from models.json
-    python finetune.py --model deepseek-coder-1.3b  # use short id from models.json
-    python finetune.py --model deepseek-ai/deepseek-coder-1.3b-base  # or full HF id directly
-
-    # Any hyperparameter flag overrides the model's default from models.json:
-    python finetune.py --model codellama-7b --epochs 3 --lr 5e-5
-
-Requirements:
-    pip install transformers peft trl datasets accelerate bitsandbytes
-"""
-
 import argparse
 import csv
 import json
