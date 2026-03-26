@@ -570,6 +570,7 @@ def train(hf_id: str, hp: dict, args):
 
     print("Applying LoRA...")
     model = get_peft_model(model, make_lora_config(hp))
+    model.enable_input_require_grads()
     model.print_trainable_parameters()
 
     # Loss masking -- train only on the tactic completion
