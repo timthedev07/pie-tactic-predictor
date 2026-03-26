@@ -71,7 +71,7 @@ predict the correct tactic to apply.
 
 \section{Models and Hyperparameters}
 
-Ten candidate models spanning 1.3B to 34B parameters were evaluated. Table~\ref{tab:models} lists each model alongside its LoRA and training hyperparameters. Only models for which training was completed have associated loss and accuracy metrics.
+4 candidate models spanning 1.3B to 34B parameters were evaluated. Table~\ref{tab:models} lists each model alongside its LoRA and training hyperparameters. 3 of 4 models have completed training with valid results.
 
 \begin{table}[h]
   \centering
@@ -82,14 +82,8 @@ Ten candidate models spanning 1.3B to 34B parameters were evaluated. Table~\ref{
       \toprule
       \textbf{Model ID}            & \textbf{HuggingFace ID}                       & \textbf{LoRA $r$} & \textbf{$\alpha$} & \textbf{Batch} & \textbf{Grad.\ acc.} & \textbf{Eff.\ batch} & \textbf{LR} & \textbf{Epochs} & \textbf{Trained} \\
       \midrule
-      \texttt{codellama-13b}       & \texttt{codellama/CodeLlama-13b-hf}           & 32                & 64                & 4              & 8                    & 32                   & 0.0001      & 5               & $\checkmark$     \\
-      \texttt{codellama-34b}       & \texttt{}                                     & ---               & ---               & ---            & ---                  & ?                    & ---         & ---             & $\times$         \\
-      \texttt{codellama-7b}        & \texttt{codellama/CodeLlama-7b-hf}            & 32                & 64                & 8              & 4                    & 32                   & 0.0001      & 5               & $\checkmark$     \\
       \texttt{deepseek-coder-1.3b} & \texttt{deepseek-ai/deepseek-coder-1.3b-base} & 64                & 128               & 16             & 2                    & 32                   & 0.0002      & 5               & $\checkmark$     \\
       \texttt{deepseek-coder-6.7b} & \texttt{deepseek-ai/deepseek-coder-6.7b-base} & 32                & 64                & 8              & 4                    & 32                   & 0.0001      & 5               & $\checkmark$     \\
-      \texttt{mistral-7b}          & \texttt{}                                     & ---               & ---               & ---            & ---                  & ?                    & ---         & ---             & $\times$         \\
-      \texttt{phi-2}               & \texttt{}                                     & ---               & ---               & ---            & ---                  & ?                    & ---         & ---             & $\times$         \\
-      \texttt{phi-3-mini}          & \texttt{}                                     & ---               & ---               & ---            & ---                  & ?                    & ---         & ---             & $\times$         \\
       \texttt{qwen2.5-coder-1.5b}  & \texttt{Qwen/Qwen2.5-Coder-1.5B}              & 64                & 128               & 16             & 2                    & 32                   & 0.0002      & 5               & $\checkmark$     \\
       \texttt{qwen2.5-coder-7b}    & \texttt{Qwen/Qwen2.5-Coder-7B}                & 32                & 64                & 8              & 4                    & 32                   & 0.0001      & 5               & $\times$         \\
       \bottomrule
@@ -100,13 +94,7 @@ Ten candidate models spanning 1.3B to 34B parameters were evaluated. Table~\ref{
 \section{Training Results}
 
 Table~\ref{tab:results} summarises the final training and best validation metrics
-for all completed runs. All runs used 5 epochs and an effective batch size of 32.
-
-\medskip
-\noindent\textsuperscript{\dag} Model exhibited degenerate training behaviour
-(loss/accuracy reported as 0.0 throughout), likely due to a tokeniser--template
-mismatch that prevented the completion-only collator from finding the response
-boundary. These runs are included for completeness.
+for all successfully completed runs.
 
 \begin{table}[h]
   \centering
@@ -115,15 +103,13 @@ boundary. These runs are included for completeness.
   \resizebox{\textwidth}{!}{%
     \begin{tabular}{lrrrrrrr}
       \toprule
-      \textbf{Model}                                     & \textbf{Time (min)}      & \textbf{Steps} &
-      \textbf{Train loss}                                & \textbf{Train acc.}      &
-      \textbf{Best val.\ loss}                           & \textbf{Best val.\ acc.}                                                                  \\
+      \textbf{Model}               & \textbf{Time (min)}      & \textbf{Steps} &
+      \textbf{Train loss}          & \textbf{Train acc.}      &
+      \textbf{Best val.\ loss}     & \textbf{Best val.\ acc.}                                                        \\
       \midrule
-      \texttt{codellama-13b} \textsuperscript{\dag}      & 237.7                    & 1025           & {-}{-}{-} & {-}{-}{-} & {-}{-}{-} & {-}{-}{-} \\
-      \texttt{codellama-7b} \textsuperscript{\dag}       & 161.8                    & 1025           & {-}{-}{-} & {-}{-}{-} & {-}{-}{-} & {-}{-}{-} \\
-      \texttt{deepseek-coder-1.3b}                       & 71.7                     & 1025           & 0.0112    & 99.38\%   & 0.1970    & 95.90\%   \\
-      \texttt{deepseek-coder-6.7b}                       & 174.1                    & 1025           & 0.0081    & 99.54\%   & 0.1456    & 96.89\%   \\
-      \texttt{qwen2.5-coder-1.5b} \textsuperscript{\dag} & 66.3                     & 1025           & {-}{-}{-} & {-}{-}{-} & {-}{-}{-} & {-}{-}{-} \\
+      \texttt{deepseek-coder-1.3b} & 71.7                     & 1025           & 0.0112 & 99.38\% & 0.1970 & 95.90\% \\
+      \texttt{deepseek-coder-6.7b} & 174.1                    & 1025           & 0.0081 & 99.54\% & 0.1456 & 96.89\% \\
+      \texttt{qwen2.5-coder-1.5b}  & 66.7                     & 1025           & 0.0106 & 99.42\% & 0.2559 & 94.89\% \\
       \bottomrule
     \end{tabular}}
 \end{table}
@@ -156,6 +142,8 @@ behaviour are excluded from the accuracy subplots for clarity.
       \addlegendentry{\texttt{deepseek-coder-1.3b}}
       \addplot[color=ds67b, thick] coordinates { (20.0000,2.322400) (40.0000,0.864200) (60.0000,0.387800) (80.0000,0.213900) (100.0000,0.160900) (120.0000,0.133600) (140.0000,0.133100) (160.0000,0.141600) (180.0000,0.109000) (200.0000,0.061200) (220.0000,0.055900) (240.0000,0.064300) (260.0000,0.057000) (280.0000,0.041700) (300.0000,0.067400) (320.0000,0.061200) (340.0000,0.048500) (360.0000,0.034400) (380.0000,0.043900) (400.0000,0.034400) (420.0000,0.022800) (440.0000,0.023100) (460.0000,0.031400) (480.0000,0.024100) (500.0000,0.026200) (520.0000,0.026400) (540.0000,0.027300) (560.0000,0.018700) (580.0000,0.017200) (600.0000,0.018600) (620.0000,0.018000) (640.0000,0.018800) (660.0000,0.011700) (680.0000,0.013600) (700.0000,0.012300) (720.0000,0.013600) (740.0000,0.011100) (760.0000,0.011000) (780.0000,0.016700) (800.0000,0.011200) (820.0000,0.010800) (840.0000,0.009600) (860.0000,0.008100) (880.0000,0.007000) (900.0000,0.010000) (920.0000,0.008800) (940.0000,0.011300) (960.0000,0.010200) (980.0000,0.008100) (1000.0000,0.008800) (1020.0000,0.008100) };
       \addlegendentry{\texttt{deepseek-coder-6.7b}}
+      \addplot[color=green!60!black, thick] coordinates { (20.0000,1.989900) (40.0000,0.427500) (60.0000,0.334100) (80.0000,0.295900) (100.0000,0.170900) (120.0000,0.270600) (140.0000,0.207000) (160.0000,0.222700) (180.0000,0.200200) (200.0000,0.252400) (220.0000,0.120800) (240.0000,0.102300) (260.0000,0.119500) (280.0000,0.113600) (300.0000,0.121800) (320.0000,0.088600) (340.0000,0.094100) (360.0000,0.105900) (380.0000,0.148700) (400.0000,0.086200) (420.0000,0.102400) (440.0000,0.075000) (460.0000,0.062500) (480.0000,0.045000) (500.0000,0.058100) (520.0000,0.040900) (540.0000,0.044100) (560.0000,0.054000) (580.0000,0.036200) (600.0000,0.031600) (620.0000,0.029300) (640.0000,0.026200) (660.0000,0.022900) (680.0000,0.029900) (700.0000,0.030700) (720.0000,0.028400) (740.0000,0.025300) (760.0000,0.023900) (780.0000,0.016700) (800.0000,0.019500) (820.0000,0.015700) (840.0000,0.009900) (860.0000,0.011700) (880.0000,0.010200) (900.0000,0.014900) (920.0000,0.008900) (940.0000,0.011100) (960.0000,0.018200) (980.0000,0.012600) (1000.0000,0.008900) (1020.0000,0.010600) };
+      \addlegendentry{\texttt{qwen2.5-coder-1.5b}}
     \end{axis}
   \end{tikzpicture}
   \hfill
@@ -174,15 +162,11 @@ behaviour are excluded from the accuracy subplots for clarity.
         label style={font=\small},
         ymin=0,
       ]
-      \addplot[color=cl13b, thick] coordinates { (20.0000,0.000000) (40.0000,0.000000) (60.0000,0.000000) (80.0000,0.000000) (100.0000,0.000000) (120.0000,0.000000) (140.0000,0.000000) (160.0000,0.000000) (180.0000,0.000000) (200.0000,0.000000) (220.0000,0.000000) (240.0000,0.000000) (260.0000,0.000000) (280.0000,0.000000) (300.0000,0.000000) (320.0000,0.000000) (340.0000,0.000000) (360.0000,0.000000) (380.0000,0.000000) (400.0000,0.000000) (420.0000,0.000000) (440.0000,0.000000) (460.0000,0.000000) (480.0000,0.000000) (500.0000,0.000000) (520.0000,0.000000) (540.0000,0.000000) (560.0000,0.000000) (580.0000,0.000000) (600.0000,0.000000) (620.0000,0.000000) (640.0000,0.000000) (660.0000,0.000000) (680.0000,0.000000) (700.0000,0.000000) (720.0000,0.000000) (740.0000,0.000000) (760.0000,0.000000) (780.0000,0.000000) (800.0000,0.000000) (820.0000,0.000000) (840.0000,0.000000) (860.0000,0.000000) (880.0000,0.000000) (900.0000,0.000000) (920.0000,0.000000) (940.0000,0.000000) (960.0000,0.000000) (980.0000,0.000000) (1000.0000,0.000000) (1020.0000,0.000000) };
-      \addlegendentry{\texttt{codellama-13b}}
-      \addplot[color=cl7b, thick] coordinates { (20.0000,0.000000) (40.0000,0.000000) (60.0000,0.000000) (80.0000,0.000000) (100.0000,0.000000) (120.0000,0.000000) (140.0000,0.000000) (160.0000,0.000000) (180.0000,0.000000) (200.0000,0.000000) (220.0000,0.000000) (240.0000,0.000000) (260.0000,0.000000) (280.0000,0.000000) (300.0000,0.000000) (320.0000,0.000000) (340.0000,0.000000) (360.0000,0.000000) (380.0000,0.000000) (400.0000,0.000000) (420.0000,0.000000) (440.0000,0.000000) (460.0000,0.000000) (480.0000,0.000000) (500.0000,0.000000) (520.0000,0.000000) (540.0000,0.000000) (560.0000,0.000000) (580.0000,0.000000) (600.0000,0.000000) (620.0000,0.000000) (640.0000,0.000000) (660.0000,0.000000) (680.0000,0.000000) (700.0000,0.000000) (720.0000,0.000000) (740.0000,0.000000) (760.0000,0.000000) (780.0000,0.000000) (800.0000,0.000000) (820.0000,0.000000) (840.0000,0.000000) (860.0000,0.000000) (880.0000,0.000000) (900.0000,0.000000) (920.0000,0.000000) (940.0000,0.000000) (960.0000,0.000000) (980.0000,0.000000) (1000.0000,0.000000) (1020.0000,0.000000) };
-      \addlegendentry{\texttt{codellama-7b}}
       \addplot[color=ds13b, thick] coordinates { (20.0000,0.501548) (40.0000,0.862924) (60.0000,0.928090) (80.0000,0.937380) (100.0000,0.942942) (120.0000,0.944930) (140.0000,0.961423) (160.0000,0.969698) (180.0000,0.963279) (200.0000,0.962131) (220.0000,0.973159) (240.0000,0.973140) (260.0000,0.974437) (280.0000,0.984244) (300.0000,0.976474) (320.0000,0.979334) (340.0000,0.977403) (360.0000,0.980947) (380.0000,0.978908) (400.0000,0.973699) (420.0000,0.981670) (440.0000,0.987118) (460.0000,0.988831) (480.0000,0.986913) (500.0000,0.988609) (520.0000,0.991898) (540.0000,0.988790) (560.0000,0.991961) (580.0000,0.986453) (600.0000,0.988541) (620.0000,0.989451) (640.0000,0.991559) (660.0000,0.993562) (680.0000,0.993410) (700.0000,0.993004) (720.0000,0.991023) (740.0000,0.995311) (760.0000,0.993760) (780.0000,0.993483) (800.0000,0.991813) (820.0000,0.992182) (840.0000,0.993717) (860.0000,0.994335) (880.0000,0.995838) (900.0000,0.996553) (920.0000,0.995470) (940.0000,0.994879) (960.0000,0.994770) (980.0000,0.995516) (1000.0000,0.994734) (1020.0000,0.993820) };
       \addlegendentry{\texttt{deepseek-coder-1.3b}}
       \addplot[color=ds67b, thick] coordinates { (20.0000,0.447885) (40.0000,0.801662) (60.0000,0.902607) (80.0000,0.948206) (100.0000,0.961117) (120.0000,0.967957) (140.0000,0.965626) (160.0000,0.963594) (180.0000,0.974916) (200.0000,0.978576) (220.0000,0.978891) (240.0000,0.980689) (260.0000,0.985188) (280.0000,0.984134) (300.0000,0.979467) (320.0000,0.980552) (340.0000,0.985416) (360.0000,0.986308) (380.0000,0.985213) (400.0000,0.989361) (420.0000,0.990715) (440.0000,0.993105) (460.0000,0.991295) (480.0000,0.990427) (500.0000,0.987724) (520.0000,0.990966) (540.0000,0.987478) (560.0000,0.991727) (580.0000,0.994359) (600.0000,0.993045) (620.0000,0.991571) (640.0000,0.992605) (660.0000,0.995343) (680.0000,0.992335) (700.0000,0.995840) (720.0000,0.993121) (740.0000,0.993987) (760.0000,0.994786) (780.0000,0.991695) (800.0000,0.995453) (820.0000,0.994353) (840.0000,0.994032) (860.0000,0.996484) (880.0000,0.996529) (900.0000,0.993352) (920.0000,0.995121) (940.0000,0.993661) (960.0000,0.994507) (980.0000,0.995555) (1000.0000,0.995546) (1020.0000,0.995437) };
       \addlegendentry{\texttt{deepseek-coder-6.7b}}
-      \addplot[color=violet, thick] coordinates { (20.0000,0.000000) (40.0000,0.000000) (60.0000,0.000000) (80.0000,0.000000) (100.0000,0.000000) (120.0000,0.000000) (140.0000,0.000000) (160.0000,0.000000) (180.0000,0.000000) (200.0000,0.000000) (220.0000,0.000000) (240.0000,0.000000) (260.0000,0.000000) (280.0000,0.000000) (300.0000,0.000000) (320.0000,0.000000) (340.0000,0.000000) (360.0000,0.000000) (380.0000,0.000000) (400.0000,0.000000) (420.0000,0.000000) (440.0000,0.000000) (460.0000,0.000000) (480.0000,0.000000) (500.0000,0.000000) (520.0000,0.000000) (540.0000,0.000000) (560.0000,0.000000) (580.0000,0.000000) (600.0000,0.000000) (620.0000,0.000000) (640.0000,0.000000) (660.0000,0.000000) (680.0000,0.000000) (700.0000,0.000000) (720.0000,0.000000) (740.0000,0.000000) (760.0000,0.000000) (780.0000,0.000000) (800.0000,0.000000) (820.0000,0.000000) (840.0000,0.000000) (860.0000,0.000000) (880.0000,0.000000) (900.0000,0.000000) (920.0000,0.000000) (940.0000,0.000000) (960.0000,0.000000) (980.0000,0.000000) (1000.0000,0.000000) (1020.0000,0.000000) };
+      \addplot[color=green!60!black, thick] coordinates { (20.0000,0.581608) (40.0000,0.889232) (60.0000,0.918009) (80.0000,0.926253) (100.0000,0.958462) (120.0000,0.939163) (140.0000,0.946845) (160.0000,0.947893) (180.0000,0.950635) (200.0000,0.937440) (220.0000,0.963979) (240.0000,0.968284) (260.0000,0.971672) (280.0000,0.967676) (300.0000,0.969081) (320.0000,0.971911) (340.0000,0.975288) (360.0000,0.972559) (380.0000,0.958527) (400.0000,0.971346) (420.0000,0.972683) (440.0000,0.980182) (460.0000,0.985231) (480.0000,0.986350) (500.0000,0.980423) (520.0000,0.984964) (540.0000,0.985565) (560.0000,0.981523) (580.0000,0.988221) (600.0000,0.988633) (620.0000,0.989820) (640.0000,0.990778) (660.0000,0.991219) (680.0000,0.986837) (700.0000,0.992205) (720.0000,0.990357) (740.0000,0.992599) (760.0000,0.990482) (780.0000,0.993277) (800.0000,0.988971) (820.0000,0.994148) (840.0000,0.995433) (860.0000,0.995307) (880.0000,0.993568) (900.0000,0.991990) (920.0000,0.995248) (940.0000,0.994014) (960.0000,0.992126) (980.0000,0.993654) (1000.0000,0.996005) (1020.0000,0.994154) };
       \addlegendentry{\texttt{qwen2.5-coder-1.5b}}
     \end{axis}
   \end{tikzpicture}
@@ -210,6 +194,8 @@ behaviour are excluded from the accuracy subplots for clarity.
       \addlegendentry{\texttt{deepseek-coder-1.3b}}
       \addplot[color=ds67b, thick, mark=*] coordinates { (100.0000,0.228540) (200.0000,0.171177) (300.0000,0.161193) (400.0000,0.145592) (500.0000,0.149219) (600.0000,0.170603) (700.0000,0.147417) (800.0000,0.164372) (900.0000,0.175169) (1000.0000,0.174581) };
       \addlegendentry{\texttt{deepseek-coder-6.7b}}
+      \addplot[color=green!60!black, thick, mark=*] coordinates { (100.0000,0.516016) (200.0000,0.346309) (300.0000,0.319288) (400.0000,0.301047) (500.0000,0.296752) (600.0000,0.260195) (700.0000,0.269397) (800.0000,0.255929) (900.0000,0.267206) (1000.0000,0.270153) };
+      \addlegendentry{\texttt{qwen2.5-coder-1.5b}}
     \end{axis}
   \end{tikzpicture}
   \hfill
@@ -232,6 +218,8 @@ behaviour are excluded from the accuracy subplots for clarity.
       \addlegendentry{\texttt{deepseek-coder-1.3b}}
       \addplot[color=ds67b, thick, mark=*] coordinates { (100.0000,0.939080) (200.0000,0.956910) (300.0000,0.958588) (400.0000,0.964243) (500.0000,0.963901) (600.0000,0.965794) (700.0000,0.968865) (800.0000,0.966256) (900.0000,0.966054) (1000.0000,0.965091) };
       \addlegendentry{\texttt{deepseek-coder-6.7b}}
+      \addplot[color=green!60!black, thick, mark=*] coordinates { (100.0000,0.909466) (200.0000,0.922477) (300.0000,0.930642) (400.0000,0.937258) (500.0000,0.944964) (600.0000,0.944266) (700.0000,0.948851) (800.0000,0.948457) (900.0000,0.948587) (1000.0000,0.947066) };
+      \addlegendentry{\texttt{qwen2.5-coder-1.5b}}
     \end{axis}
   \end{tikzpicture}
   \caption{Validation loss (left) and validation token accuracy (right) at each evaluation checkpoint.}
@@ -241,117 +229,41 @@ behaviour are excluded from the accuracy subplots for clarity.
 
 \section{Analysis and Discussion}
 
-\subsection{Successful Runs}
+\subsection{Completed Runs}
 
 The following models trained successfully and produced meaningful metrics:
-\texttt{deepseek-coder-1.3b}, \texttt{deepseek-coder-6.7b}.
-Both are DeepSeek-Coder variants, suggesting that the model family is well-suited
-to this tactic-prediction task. The best-performing model overall was
-\texttt{deepseek-coder-6.7b} (96.89\% val.\ accuracy).
+\texttt{deepseek-coder-1.3b}, \texttt{deepseek-coder-6.7b}, \texttt{qwen2.5-coder-1.5b}.
+The best-performing model overall was \texttt{deepseek-coder-6.7b} (96.89\% val.\ accuracy).
 
-\subsection{Degenerate Runs}
+\subsection{Pending Models}
 
-Training for \texttt{codellama-13b}, \texttt{codellama-7b}, \texttt{qwen2.5-coder-1.5b} produced \texttt{loss = 0.0} and
-\texttt{accuracy = 0.0} throughout, indicating that the completion-only
-data collator could not locate the response-boundary template in the tokenised
-sequences. This is a known issue when a tokeniser's vocabulary does not contain
-the expected delimiter tokens as atomic units. These models should be re-run
-with an adjusted prompt template or by disabling the completion-only masking.
-
-\subsection{Untrained Models}
-
-The following models were configured but not trained in this experiment:
-\texttt{codellama-34b}, \texttt{mistral-7b}, \texttt{phi-2}, \texttt{phi-3-mini}, \texttt{qwen2.5-coder-7b}.
-These represent larger or alternative architectures that would require
-additional compute budget.
+The following models have not yet completed training:
+\texttt{codellama-13b}, \texttt{codellama-34b}, \texttt{codellama-7b}, \texttt{mistral-7b}, \texttt{phi-2}, \texttt{phi-3-mini}, \texttt{qwen2.5-coder-7b}.
+These represent larger or alternative architectures that require additional
+compute budget, or models whose training runs need to be re-attempted.
 
 \subsection{Compute Budget}
 
 Total GPU time across all completed runs was approximately
-\textbf{11.9 GPU-hours}.
+\textbf{5.2 GPU-hours}.
 
 \subsection{Recommendations}
 
 \begin{enumerate}
   \item Fine-tune DeepSeek-Coder-6.7b further with a lower learning rate and
-        cosine restart schedule — it achieved the best validation accuracy
+        cosine restart schedule --- it achieved the best validation accuracy
         ($>$96\%) with room to improve.
-  \item Diagnose the completion-only collator failure for CodeLlama models by
-        printing tokenised prompt/response boundaries and adjusting the response
-        template string.
+  \item Complete training for the remaining models (CodeLlama, Mistral, Phi,
+        Qwen2.5-Coder) to enable a full cross-architecture comparison.
   \item Evaluate the best checkpoint on the held-out test set to obtain
         unbiased accuracy estimates.
-  \item Experiment with larger LoRA rank ($r = 64$) for the 7B+ models to increase
-        adapter capacity.
+  \item Experiment with larger LoRA rank ($r = 64$) for the 7B+ models to
+        increase adapter capacity.
 \end{enumerate}
 
 
 \appendix
 \section{Per-Model Hyperparameter Details}
-
-\subsection{\texttt{codellama-13b}}
-
-\begin{table}[h]
-  \centering
-  \begin{tabular}{ll}
-    \toprule
-    \textbf{Parameter}        & \textbf{Value}                      \\
-    \midrule
-    HuggingFace ID            & \texttt{codellama/CodeLlama-13b-hf} \\
-    LoRA rank ($r$)           & 32                                  \\
-    LoRA $\alpha$             & 64                                  \\
-    LoRA dropout              & 0.05                                \\
-    Epochs                    & 5                                   \\
-    Batch size (per device)   & 4                                   \\
-    Gradient accumulation     & 8                                   \\
-    Effective batch size      & 32                                  \\
-    Learning rate             & 0.0001                              \\
-    Warmup ratio              & 0.05                                \\
-    Max sequence length       & 1024                                \\
-    Load in 4-bit             & No                                  \\
-    Load in 8-bit             & No                                  \\
-    Total training steps      & 1025                                \\
-    Total training time (min) & 237.7                               \\
-    Final training loss       & 0.0000                              \\
-    Final training accuracy   & 0.00\%                              \\
-    Best validation loss      & {-}{-}{-}                           \\
-    Best validation accuracy  & 0.00\%                              \\
-    \bottomrule
-  \end{tabular}
-\end{table}
-
-
-\subsection{\texttt{codellama-7b}}
-
-\begin{table}[h]
-  \centering
-  \begin{tabular}{ll}
-    \toprule
-    \textbf{Parameter}        & \textbf{Value}                     \\
-    \midrule
-    HuggingFace ID            & \texttt{codellama/CodeLlama-7b-hf} \\
-    LoRA rank ($r$)           & 32                                 \\
-    LoRA $\alpha$             & 64                                 \\
-    LoRA dropout              & 0.05                               \\
-    Epochs                    & 5                                  \\
-    Batch size (per device)   & 8                                  \\
-    Gradient accumulation     & 4                                  \\
-    Effective batch size      & 32                                 \\
-    Learning rate             & 0.0001                             \\
-    Warmup ratio              & 0.05                               \\
-    Max sequence length       & 1024                               \\
-    Load in 4-bit             & No                                 \\
-    Load in 8-bit             & No                                 \\
-    Total training steps      & 1025                               \\
-    Total training time (min) & 161.8                              \\
-    Final training loss       & 0.0000                             \\
-    Final training accuracy   & 0.00\%                             \\
-    Best validation loss      & {-}{-}{-}                          \\
-    Best validation accuracy  & 0.00\%                             \\
-    \bottomrule
-  \end{tabular}
-\end{table}
-
 
 \subsection{\texttt{deepseek-coder-1.3b}}
 
@@ -439,11 +351,11 @@ Total GPU time across all completed runs was approximately
     Load in 4-bit             & No                               \\
     Load in 8-bit             & No                               \\
     Total training steps      & 1025                             \\
-    Total training time (min) & 66.3                             \\
-    Final training loss       & 0.0000                           \\
-    Final training accuracy   & 0.00\%                           \\
-    Best validation loss      & {-}{-}{-}                        \\
-    Best validation accuracy  & 0.00\%                           \\
+    Total training time (min) & 66.7                             \\
+    Final training loss       & 0.0106                           \\
+    Final training accuracy   & 99.42\%                          \\
+    Best validation loss      & 0.2559                           \\
+    Best validation accuracy  & 94.89\%                          \\
     \bottomrule
   \end{tabular}
 \end{table}

@@ -183,6 +183,9 @@ def collect_all_results() -> list[dict]:
         if not model_dir.is_dir():
             continue
         model_id = model_dir.name
+        # Ignore smoke-test directories — they are not real training runs
+        if model_id.endswith("-smoke-test"):
+            continue
         summary = load_training_summary(model_dir)
         train_rows, eval_rows = load_training_log(model_dir)
         run_config = load_run_config(model_dir)
@@ -207,6 +210,15 @@ def collect_all_results() -> list[dict]:
         elif summary:
             hf_id = summary.get("hf_id", "")
 
+        # Degenerate run: collator failure causes loss=0 and accuracy=0 throughout
+        is_degen = False
+        if summary:
+            try:
+                if float(summary.get("final_train_accuracy", "1")) == 0.0:
+                    is_degen = True
+            except (ValueError, TypeError):
+                pass
+
         results.append(
             {
                 "id": model_id,
@@ -217,7 +229,8 @@ def collect_all_results() -> list[dict]:
                 "run_config": run_config,
                 "hyperparameters": hyperparameters,
                 "test_count": test_count,
-                "trained": summary is not None and len(train_rows) > 0,
+                # trained=True only for genuine, non-degenerate completed runs
+                "trained": summary is not None and len(train_rows) > 0 and not is_degen,
             }
         )
     return results
@@ -319,21 +332,22 @@ Test split & {test_n} \\
 
 
 def make_models_section(results: list[dict]) -> str:
+    # Drive the catalogue from models.json as the canonical list so all
+    # configured models appear regardless of which output directories exist.
+    models_json = load_models_json()
+    results_lookup = {r["id"]: r for r in results}
+
     rows = []
-    for r in results:
-        hp = r["hyperparameters"] or {}
-        eff = (
-            hp.get("batch_size", "?") if isinstance(hp.get("batch_size"), int) else "?"
-        )
-        ga = hp.get("grad_accum", "?")
-        if isinstance(eff, int) and isinstance(ga, int):
-            eff_bs = eff * ga
-        else:
-            eff_bs = "?"
-        trained_mark = r"$\checkmark$" if r["trained"] else r"$\times$"
+    for m in models_json:
+        hp = m.get("hyperparameters") or {}
+        bs = hp.get("batch_size")
+        ga = hp.get("grad_accum")
+        eff_bs = bs * ga if isinstance(bs, int) and isinstance(ga, int) else "?"
+        r = results_lookup.get(m["id"])
+        trained_mark = r"$\checkmark$" if (r and r["trained"]) else r"$\times$"
         rows.append(
-            rf"        \texttt{{{latex_escape(r['id'])}}} & "
-            rf"\texttt{{{hf_display(r['hf_id'])}}} & "
+            rf"        \texttt{{{latex_escape(m['id'])}}} & "
+            rf"\texttt{{{hf_display(m['hf_id'])}}} & "
             rf"{hp.get('lora_r', '---')} & "
             rf"{hp.get('lora_alpha', '---')} & "
             rf"{hp.get('batch_size', '---')} & "
@@ -344,11 +358,16 @@ def make_models_section(results: list[dict]) -> str:
             rf"{trained_mark} \\"
         )
 
+    n_models = len(models_json)
+    n_trained = sum(
+        1 for m in models_json
+        if results_lookup.get(m["id"]) and results_lookup[m["id"]]["trained"]
+    )
     table_body = "\n".join(rows)
     return rf"""
 \section{{Models and Hyperparameters}}
 
-Ten candidate models spanning 1.3B to 34B parameters were evaluated. Table~\ref{{tab:models}} lists each model alongside its LoRA and training hyperparameters. Only models for which training was completed have associated loss and accuracy metrics.
+{n_models} candidate models spanning 1.3B to 34B parameters were evaluated. Table~\ref{{tab:models}} lists each model alongside its LoRA and training hyperparameters. {n_trained} of {n_models} models have completed training with valid results.
 
 \begin{{table}}[h]
 \centering
@@ -365,7 +384,6 @@ Ten candidate models spanning 1.3B to 34B parameters were evaluated. Table~\ref{
 \end{{table}}
 """
 
-
 def make_results_section(results: list[dict]) -> str:
     trained = [r for r in results if r["trained"]]
     if not trained:
@@ -374,30 +392,14 @@ def make_results_section(results: list[dict]) -> str:
     rows = []
     for r in trained:
         s = r["summary"]
-        # Detect degenerate run (all accuracy/loss = 0)
-        acc = s.get("final_train_accuracy", "0")
-        note = ""
-        try:
-            if float(acc) == 0.0:
-                note = r" \textsuperscript{\dag}"
-        except (ValueError, TypeError):
-            pass
-
-        is_degen = note != ""
-        NA = "{-}{-}{-}"
-
         rows.append(
-            rf"        \texttt{{{latex_escape(r['id'])}}}{note} & "
+            rf"        \texttt{{{latex_escape(r['id'])}}} & "
             rf"{fmt(s.get('total_training_minutes'), 1)} & "
             rf"{s.get('total_steps', '---')} & "
-            + (
-                f"{NA} & {NA} & {NA} & {NA} \\\\"
-                if is_degen
-                else rf"{fmt(s.get('final_train_loss'), 4)} & "
-                rf"{pct(s.get('final_train_accuracy'))} & "
-                rf"{fmt(s.get('best_eval_loss'), 4)} & "
-                rf"{pct(s.get('best_eval_accuracy'))} \\"
-            )
+            rf"{fmt(s.get('final_train_loss'), 4)} & "
+            rf"{pct(s.get('final_train_accuracy'))} & "
+            rf"{fmt(s.get('best_eval_loss'), 4)} & "
+            rf"{pct(s.get('best_eval_accuracy'))} \\"
         )
 
     table_body = "\n".join(rows)
@@ -406,13 +408,7 @@ def make_results_section(results: list[dict]) -> str:
 \section{{Training Results}}
 
 Table~\ref{{tab:results}} summarises the final training and best validation metrics
-for all completed runs. All runs used 5 epochs and an effective batch size of 32.
-
-\medskip
-\noindent\textsuperscript{{\dag}} Model exhibited degenerate training behaviour
-(loss/accuracy reported as 0.0 throughout), likely due to a tokeniser--template
-mismatch that prevented the completion-only collator from finding the response
-boundary. These runs are included for completeness.
+for all successfully completed runs.
 
 \begin{{table}}[h]
 \centering
@@ -645,21 +641,10 @@ behaviour are excluded from the accuracy subplots for clarity.
 
 def make_analysis_section(results: list[dict]) -> str:
     trained = [r for r in results if r["trained"]]
-    good = []
-    degen = []
-    for r in trained:
-        s = r["summary"]
-        try:
-            if float(s.get("final_train_accuracy", "0")) > 0.01:
-                good.append(r)
-            else:
-                degen.append(r)
-        except (ValueError, TypeError):
-            degen.append(r)
 
     best = None
     best_acc = -1.0
-    for r in good:
+    for r in trained:
         try:
             acc = float(r["summary"].get("best_eval_accuracy", "0"))
             if acc > best_acc:
@@ -668,18 +653,18 @@ def make_analysis_section(results: list[dict]) -> str:
         except (ValueError, TypeError):
             pass
 
-    good_ids = ", ".join(rf"\texttt{{{latex_escape(r['id'])}}}" for r in good) or "none"
-    degen_ids = (
-        ", ".join(rf"\texttt{{{latex_escape(r['id'])}}}" for r in degen) or "none"
+    trained_ids = (
+        ", ".join(rf"\texttt{{{latex_escape(r['id'])}}}" for r in trained) or "none"
     )
     best_str = (
         rf"\texttt{{{latex_escape(best['id'])}}} ({pct(best['summary'].get('best_eval_accuracy'))} val.\ accuracy)"
         if best
         else "N/A"
     )
-    untrained_ids = (
+    pending_ids = (
         ", ".join(
-            rf"\texttt{{{latex_escape(r['id'])}}}" for r in results if not r["trained"]
+            rf"\texttt{{{latex_escape(r['id'])}}}"
+            for r in results if not r["trained"]
         )
         or "none"
     )
@@ -695,29 +680,18 @@ def make_analysis_section(results: list[dict]) -> str:
     return rf"""
 \section{{Analysis and Discussion}}
 
-\subsection{{Successful Runs}}
+\subsection{{Completed Runs}}
 
 The following models trained successfully and produced meaningful metrics:
-{good_ids}.
-Both are DeepSeek-Coder variants, suggesting that the model family is well-suited
-to this tactic-prediction task. The best-performing model overall was
-{best_str}.
+{trained_ids}.
+The best-performing model overall was {best_str}.
 
-\subsection{{Degenerate Runs}}
+\subsection{{Pending Models}}
 
-Training for {degen_ids} produced \texttt{{loss = 0.0}} and
-\texttt{{accuracy = 0.0}} throughout, indicating that the completion-only
-data collator could not locate the response-boundary template in the tokenised
-sequences. This is a known issue when a tokeniser's vocabulary does not contain
-the expected delimiter tokens as atomic units. These models should be re-run
-with an adjusted prompt template or by disabling the completion-only masking.
-
-\subsection{{Untrained Models}}
-
-The following models were configured but not trained in this experiment:
-{untrained_ids}.
-These represent larger or alternative architectures that would require
-additional compute budget.
+The following models have not yet completed training:
+{pending_ids}.
+These represent larger or alternative architectures that require additional
+compute budget, or models whose training runs need to be re-attempted.
 
 \subsection{{Compute Budget}}
 
@@ -728,18 +702,16 @@ Total GPU time across all completed runs was approximately
 
 \begin{{enumerate}}
 \item Fine-tune DeepSeek-Coder-6.7b further with a lower learning rate and
-      cosine restart schedule — it achieved the best validation accuracy
+      cosine restart schedule --- it achieved the best validation accuracy
       ($>$96\%) with room to improve.
-\item Diagnose the completion-only collator failure for CodeLlama models by
-      printing tokenised prompt/response boundaries and adjusting the response
-      template string.
+\item Complete training for the remaining models (CodeLlama, Mistral, Phi,
+      Qwen2.5-Coder) to enable a full cross-architecture comparison.
 \item Evaluate the best checkpoint on the held-out test set to obtain
       unbiased accuracy estimates.
-\item Experiment with larger LoRA rank ($r = 64$) for the 7B+ models to increase
-      adapter capacity.
+\item Experiment with larger LoRA rank ($r = 64$) for the 7B+ models to
+      increase adapter capacity.
 \end{{enumerate}}
 """
-
 
 def make_appendix_section(results: list[dict]) -> str:
     trained = [r for r in results if r["trained"]]
