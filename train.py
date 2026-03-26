@@ -29,7 +29,7 @@ class _CompletionOnlyCollator:
     """Masks prompt tokens so the model only trains on the tactic completion.
 
     Each feature must contain ``input_ids`` (list[int]), ``prompt_length``
-    (int), and ``seq_length`` (int — the *un-padded* token count).  Tokens at
+    (int), and ``seq_length`` (int -- the *un-padded* token count).  Tokens at
     positions < prompt_length are masked with -100 so they do not contribute
     to the loss, and positions >= seq_length (i.e. padding) are also masked.
 
@@ -94,7 +94,7 @@ def load_models_list() -> list[dict]:
     script_dir = Path(__file__).parent
     models_path = script_dir / MODELS_FILE
     if not models_path.exists():
-        print(f"[warning] {MODELS_FILE} not found — model list unavailable.")
+        print(f"[warning] {MODELS_FILE} not found -- model list unavailable.")
         return []
     with open(models_path) as f:
         return json.load(f)
@@ -120,7 +120,7 @@ def pick_model_interactively(models: list[dict]) -> dict:
     with default hyperparameters.
     """
     print("\n" + "=" * 70)
-    print("  Pie Tactic Fine-tuning — Model Selection")
+    print("  Pie Tactic Fine-tuning -- Model Selection")
     print("=" * 70)
 
     if models:
@@ -157,10 +157,10 @@ def pick_model_interactively(models: list[dict]) -> dict:
             elif choice == len(models) + 1:
                 raw = ""
             else:
-                print(f"  Enter 1–{len(models) + 1}.")
+                print(f"  Enter 1-{len(models) + 1}.")
                 continue
 
-        # Typed id — could be short id, full hf_id, or completely custom
+        # Typed id -- could be short id, full hf_id, or completely custom
         if not raw:
             raw = input("  HuggingFace model ID (e.g. facebook/opt-1.3b): ").strip()
             if not raw:
@@ -173,7 +173,7 @@ def pick_model_interactively(models: list[dict]) -> dict:
             print(f"\n  Matched  : {match['id']}  ({match['hf_id']})")
             return match
 
-        # Completely unknown — use defaults
+        # Completely unknown -- use defaults
         print(f"\n  Custom model: {raw}")
         print(f"  Using default hyperparameters (override with CLI flags).")
         return {
@@ -194,7 +194,7 @@ def parse_args():
         formatter_class=argparse.RawTextHelpFormatter,
     )
 
-    # Model — accepts either short id (from models.json) or full HF id
+    # Model -- accepts either short id (from models.json) or full HF id
     parser.add_argument(
         "--model",
         type=str,
@@ -215,7 +215,7 @@ def parse_args():
     parser.add_argument("--load-in-4bit", action="store_true")
     parser.add_argument("--load-in-8bit", action="store_true")
 
-    # Hyperparameter overrides — all optional, fall back to models.json values
+    # Hyperparameter overrides -- all optional, fall back to models.json values
     parser.add_argument("--lora-r", type=int, default=None)
     parser.add_argument("--lora-alpha", type=int, default=None)
     parser.add_argument("--lora-dropout", type=float, default=None)
@@ -369,7 +369,7 @@ def load_jsonl(path: str) -> list[dict]:
 def split_by_proof(
     rows: list[dict], val_frac: float, test_frac: float, seed: int
 ) -> tuple[list[dict], list[dict], list[dict]]:
-    """Split at proof level — no proof leaks across train / val / test."""
+    """Split at proof level -- no proof leaks across train / val / test."""
     proof_map: dict[str, list[dict]] = {}
     for row in rows:
         proof_map.setdefault(row["theoremName"], []).append(row)
@@ -396,7 +396,7 @@ def make_hf_dataset(rows: list[dict], tokenizer, max_seq_len: int) -> Dataset:
 
     Because the prompt template ends with a newline and BPE pre-tokenisers
     split on newlines, ``tokenize(prompt + tactic)[:n]`` equals
-    ``tokenize(prompt)`` — so the prompt token count is an accurate mask
+    ``tokenize(prompt)`` -- so the prompt token count is an accurate mask
     boundary.  This is immune to tokeniser quirks that broke the previous
     token-ID-scanning approach.
 
@@ -572,11 +572,11 @@ def train(hf_id: str, hp: dict, args):
     model = get_peft_model(model, make_lora_config(hp))
     model.print_trainable_parameters()
 
-    # Loss masking — train only on the tactic completion
+    # Loss masking -- train only on the tactic completion
     collator = _CompletionOnlyCollator(tokenizer=tokenizer)
 
     # For smoke tests, collapse everything into 1 epoch with tiny step counts
-    # so the entire train→eval→save path is exercised quickly.
+    # so the entire train->eval->save path is exercised quickly.
     if _smoke:
         _num_epochs = 1
         _steps_per_epoch = max(1, len(train_rows) // hp["batch_size"])
@@ -650,7 +650,7 @@ def train(hf_id: str, hp: dict, args):
         if resume_from:
             print(f"  Resuming from checkpoint: {resume_from}\n")
         else:
-            print("  --resume set but no checkpoint found — starting from scratch.\n")
+            print("  --resume set but no checkpoint found -- starting from scratch.\n")
 
     trainer.train(resume_from_checkpoint=resume_from)
     total_training_seconds = time.time() - t0
@@ -658,7 +658,7 @@ def train(hf_id: str, hp: dict, args):
     final_path = os.path.join(output_dir, "final")
     trainer.save_model(final_path)
     tokenizer.save_pretrained(final_path)
-    print(f"\nSaved → {final_path}")
+    print(f"\nSaved -> {final_path}")
 
     # Save resolved hyperparameters alongside the model
     with open(os.path.join(output_dir, "run_config.json"), "w") as f:
@@ -696,7 +696,7 @@ def _save_training_csv(
     """Write a detailed per-step CSV from trainer.state.log_history."""
     log_history = trainer.state.log_history
     if not log_history:
-        print("[csv] No log history available — skipping CSV export.")
+        print("[csv] No log history available -- skipping CSV export.")
         return
 
     # Collect all unique column names across all log entries, preserving a
@@ -807,8 +807,8 @@ def _save_training_csv(
             }
         )
 
-    print(f"  Training log  → {csv_path}")
-    print(f"  Summary row   → {summary_path}")
+    print(f"  Training log  -> {csv_path}")
+    print(f"  Summary row   -> {summary_path}")
 
 
 # ---------------------------------------------------------------------------
@@ -846,7 +846,7 @@ def test_inference(model, tokenizer, test_rows: list[dict], n: int = 5):
         print(f"  goal   : {row['goal'].strip()[:80]}")
         print(f"  truth  : {row['tactic']}")
         print(f"  pred   : {prediction}")
-        print(f"  match  : {'✓' if prediction == row['tactic'] else '✗'}\n")
+        print(f"  match  : {'[ok]' if prediction == row['tactic'] else '[x]'}\n")
 
 
 # ---------------------------------------------------------------------------
@@ -896,7 +896,7 @@ def _run_parallel(args):
 
     models = load_models_list()
     if not models:
-        print("[parallel] No models found in models.json — nothing to do.")
+        print("[parallel] No models found in models.json -- nothing to do.")
         return
 
     # Filter to only untrained models
@@ -910,15 +910,15 @@ def _run_parallel(args):
     if skipped:
         print(f"[parallel] Skipping already-trained model(s): {', '.join(skipped)}")
     if not pending:
-        print("[parallel] All models are already trained — nothing to do.")
+        print("[parallel] All models are already trained -- nothing to do.")
         return
 
     n_gpus = torch.cuda.device_count()
     if n_gpus == 0:
-        print("[parallel] No CUDA GPUs detected — cannot run parallel training.")
+        print("[parallel] No CUDA GPUs detected -- cannot run parallel training.")
         exit(1)
 
-    print(f"\n[parallel] {len(pending)} model(s) to train × {n_gpus} GPU(s) available")
+    print(f"\n[parallel] {len(pending)} model(s) to train x {n_gpus} GPU(s) available")
     print("[parallel] Models will be queued and dispatched as GPUs free up.\n")
 
     gpu_pool: queue.Queue[int] = queue.Queue()
@@ -967,12 +967,12 @@ def _run_parallel(args):
                     cmd.append("--resume")
 
             action = f"resuming from {latest_ckpt}" if latest_ckpt else "starting fresh"
-            print(f"  [GPU {gpu_idx}] {model_entry['id']} — {action}")
+            print(f"  [GPU {gpu_idx}] {model_entry['id']} -- {action}")
             proc = subprocess.Popen(cmd, env=env)
             proc.wait()
             rc = proc.returncode
             status = "done" if rc == 0 else f"FAILED (exit {rc})"
-            print(f"  [GPU {gpu_idx}] finished  {model_entry['id']} — {status}")
+            print(f"  [GPU {gpu_idx}] finished  {model_entry['id']} -- {status}")
             return model_entry["id"], rc
         finally:
             gpu_pool.put(gpu_idx)
@@ -1010,9 +1010,9 @@ if __name__ == "__main__":
     else:
         model_entry = find_model(models, args.model)
         if model_entry is None:
-            # Completely unknown id — treat as raw HF id with defaults
+            # Completely unknown id -- treat as raw HF id with defaults
             print(
-                f"  '{args.model}' not found in models.json — using default hyperparameters."
+                f"  '{args.model}' not found in models.json -- using default hyperparameters."
             )
             model_entry = {
                 "id": args.model.split("/")[-1],
@@ -1043,7 +1043,7 @@ if __name__ == "__main__":
     if args.smoke_test is not None:
         _smoke_dir = args.output_dir or f"./output/{args.model_id}-smoke-test"
         print(
-            f"  smoke test       : {args.smoke_test} samples — writes to {_smoke_dir}"
+            f"  smoke test       : {args.smoke_test} samples -- writes to {_smoke_dir}"
         )
     if args.resume:
         _out = args.output_dir or f"./output/{args.model_id}"
@@ -1052,15 +1052,15 @@ if __name__ == "__main__":
             if isinstance(args.resume, str)
             else find_latest_checkpoint(_out)
         )
-        print(f"  resume from      : {_ckpt or '(auto — no checkpoint found yet)'}")
+        print(f"  resume from      : {_ckpt or '(auto -- no checkpoint found yet)'}")
     print(f"{'='*62}")
 
     if not args.yes:
         import sys
 
         if not sys.stdin.isatty():
-            # Running under nohup / backgrounded — treat as confirmed
-            print("  (non-interactive stdin detected — auto-confirming)")
+            # Running under nohup / backgrounded -- treat as confirmed
+            print("  (non-interactive stdin detected -- auto-confirming)")
         else:
             confirm = input("\n  Start training? [Y/n]: ").strip().lower()
             if confirm not in ("", "y", "yes"):
