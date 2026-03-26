@@ -38,13 +38,24 @@ from trl import SFTTrainer, SFTConfig
 class _CompletionOnlyCollator:
     """Masks loss on prompt tokens so the model only trains on the tactic.
 
-    Uses decode-then-re-encode to locate the response boundary, which is
-    robust across all tokenizer families:
-      - BPE/CodeGen (DeepSeek-Coder): no dummy prefix, may have BOS
-      - SentencePiece (CodeLlama/Mistral): add_dummy_prefix adds a leading
-        space marker to the first token of any standalone encoding, but BOS
-        compensation makes the formula n_prompt = len(encode(text)) + has_bos
-      - tiktoken (Qwen2.5-Coder): no dummy prefix, BOS may or may not exist
+    Finds the response boundary by encoding the separator in mid-sequence
+    context (prefixed with a single-character anchor) to obtain the exact
+    token IDs that appear inside a training sequence.  This avoids two
+    failure modes of simpler approaches:
+
+    1. Standalone encoding (original bug): SentencePiece's add_dummy_prefix
+       inserts a spurious leading-space token at position 0 of any isolated
+       encode() call, producing token IDs that differ from those in the full
+       sequence.
+
+    2. Decode-then-find (previous attempt): SentencePiece decodes the
+       word-initial ▁ marker as a literal space, so "\n###" round-trips as
+       "\n ###", and text.find(RESPONSE_SEP) always returns -1.
+
+    The context-prefix trick: encode("A" + RESPONSE_SEP) and encode("A"),
+    then sep_ids = combined[len(prefix):].  "A" at position 0 absorbs the
+    dummy-prefix artifact, and the remaining tokens are exactly what would
+    appear mid-sequence.  Works for BPE, tiktoken, and SentencePiece.
     """
 
     RESPONSE_SEP = "\n### Next tactic\n"
@@ -52,6 +63,18 @@ class _CompletionOnlyCollator:
     def __init__(self, tokenizer):
         self.tokenizer = tokenizer
         self._warned = False
+
+        # Compute exact mid-sequence token IDs for the separator once at init.
+        prefix_ids = tokenizer.encode("A", add_special_tokens=False)
+        combined_ids = tokenizer.encode(
+            "A" + self.RESPONSE_SEP, add_special_tokens=False
+        )
+        self.sep_ids: list[int] = combined_ids[len(prefix_ids) :]
+        self._sep_len = len(self.sep_ids)
+        if self._sep_len == 0:
+            raise ValueError(
+                "RESPONSE_SEP tokenised to zero tokens — check the separator string."
+            )
 
     def __call__(self, features: list[dict]) -> dict:
         input_ids = torch.nn.utils.rnn.pad_sequence(
@@ -62,32 +85,20 @@ class _CompletionOnlyCollator:
         attention_mask = (input_ids != self.tokenizer.pad_token_id).long()
         labels = input_ids.clone()
 
+        tmpl = self.sep_ids
+        tlen = self._sep_len
         n_failed = 0
         for i, f in enumerate(features):
-            ids = f["input_ids"]
-            # Decode without special tokens — separator only contains regular chars
-            text = self.tokenizer.decode(ids, skip_special_tokens=True)
-            pos = text.find(self.RESPONSE_SEP)
-            if pos == -1:
+            ids = list(f["input_ids"])  # plain list for slice comparison
+            found = False
+            for j in range(len(ids) - tlen + 1):
+                if ids[j : j + tlen] == tmpl:
+                    labels[i, : j + tlen] = -100
+                    found = True
+                    break
+            if not found:
                 labels[i] = -100
                 n_failed += 1
-                continue
-            sep_end = pos + len(self.RESPONSE_SEP)
-            # Re-encode the prompt+sep portion to count how many tokens to mask.
-            # For SentencePiece: encode() prepends a dummy-space marker to the
-            # first token (same effect as BOS in the full sequence), so the
-            # counts cancel: mask_len = n_prompt_tokens + int(has_bos).
-            # For tiktoken/BPE: no dummy prefix, same formula holds.
-            n_prompt_tokens = len(
-                self.tokenizer.encode(text[:sep_end], add_special_tokens=False)
-            )
-            has_bos = (
-                self.tokenizer.bos_token_id is not None
-                and len(ids) > 0
-                and ids[0] == self.tokenizer.bos_token_id
-            )
-            mask_len = min(n_prompt_tokens + int(has_bos), len(ids))
-            labels[i, :mask_len] = -100
 
         if n_failed > 0 and not self._warned:
             frac = n_failed / len(features)
