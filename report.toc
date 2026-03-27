@@ -1,6 +1,12 @@
 \contentsline {section}{\numberline {1}Dataset}{2}{section.1}%
 \contentsline {section}{\numberline {2}Models and Hyperparameters}{2}{section.2}%
 \contentsline {section}{\numberline {3}Training Results}{2}{section.3}%
-\contentsline {section}{\numberline {4}Analysis and Discussion}{2}{section.4}%
-\contentsline {subsection}{\numberline {4.1}Completed Runs}{2}{subsection.4.1}%
-\contentsline {subsection}{\numberline {4.2}Compute Budget}{2}{subsection.4.2}%
+\contentsline {section}{\numberline {4}Learning Curves}{2}{section.4}%
+\contentsline {section}{\numberline {5}Analysis and Discussion}{3}{section.5}%
+\contentsline {subsection}{\numberline {5.1}Completed Runs}{3}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}Compute Budget}{3}{subsection.5.2}%
+\contentsline {section}{\numberline {A}Per-Model Hyperparameter Details}{4}{appendix.A}%
+\contentsline {subsection}{\numberline {A.1}\texttt {deepseek-coder-1.3b}}{4}{subsection.A.1}%
+\contentsline {subsection}{\numberline {A.2}\texttt {deepseek-coder-6.7b}}{4}{subsection.A.2}%
+\contentsline {subsection}{\numberline {A.3}\texttt {qwen2.5-coder-1.5b}}{5}{subsection.A.3}%
+\contentsline {subsection}{\numberline {A.4}\texttt {qwen2.5-coder-7b}}{5}{subsection.A.4}%
