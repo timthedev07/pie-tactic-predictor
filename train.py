@@ -511,7 +511,33 @@ def make_lora_config(hp: dict) -> LoraConfig:
 
 
 # ---------------------------------------------------------------------------
-# 7. Training
+# 7. Metrics
+# ---------------------------------------------------------------------------
+
+
+def _preprocess_logits_for_metrics(logits, labels):
+    """Collapse logits to argmax predictions on GPU to save memory."""
+    if isinstance(logits, tuple):
+        logits = logits[0]
+    # Shift: logit at position i predicts the token at position i+1
+    return logits[:, :-1, :].argmax(dim=-1)
+
+
+def _compute_metrics(eval_pred):
+    """Token-level accuracy on non-masked (completion) positions."""
+    import numpy as np
+
+    preds, labels = eval_pred
+    # Align labels with shifted predictions
+    labels = labels[:, 1:]
+    mask = labels != -100
+    if mask.sum() == 0:
+        return {"accuracy": 0.0}
+    return {"accuracy": float(np.mean(preds[mask] == labels[mask]))}
+
+
+# ---------------------------------------------------------------------------
+# 8. Training
 # ---------------------------------------------------------------------------
 
 
@@ -636,6 +662,8 @@ def train(hf_id: str, hp: dict, args):
         eval_dataset=val_ds,
         data_collator=collator,
         args=training_args,
+        compute_metrics=_compute_metrics,
+        preprocess_logits_for_metrics=_preprocess_logits_for_metrics,
     )
 
     print("\nTraining...\n")
@@ -681,7 +709,7 @@ def train(hf_id: str, hp: dict, args):
 
 
 # ---------------------------------------------------------------------------
-# 8. Training CSV export
+# 9. Training CSV export
 # ---------------------------------------------------------------------------
 
 
@@ -749,7 +777,13 @@ def _save_training_csv(
     eval_entries = [e for e in log_history if "eval_loss" in e]
     best_eval_loss = min((e["eval_loss"] for e in eval_entries), default="")
     best_eval_acc = (
-        max((e.get("eval_mean_token_accuracy", 0) for e in eval_entries), default="")
+        max(
+            (
+                e.get("eval_accuracy", e.get("eval_mean_token_accuracy", 0))
+                for e in eval_entries
+            ),
+            default="",
+        )
         if eval_entries
         else ""
     )
@@ -814,7 +848,7 @@ def _save_training_csv(
 
 
 # ---------------------------------------------------------------------------
-# 9. Quick inference check
+# 10. Quick inference check
 # ---------------------------------------------------------------------------
 
 
@@ -852,7 +886,7 @@ def test_inference(model, tokenizer, test_rows: list[dict], n: int = 5):
 
 
 # ---------------------------------------------------------------------------
-# 9. Entry point
+# 11. Entry point
 # ---------------------------------------------------------------------------
 
 
