@@ -1,17 +1,17 @@
 ---
-base_model: deepseek-ai/deepseek-coder-6.7b-base
+base_model: deepseek-ai/deepseek-coder-1.3b-base
 library_name: transformers
-model_name: deepseek-coder-6.7b
+model_name: deepseek-coder-1.3b
 tags:
 - generated_from_trainer
-- trl
 - sft
+- trl
 licence: license
 ---
 
-# Model Card for deepseek-coder-6.7b
+# Model Card for deepseek-coder-1.3b
 
-This model is a fine-tuned version of [deepseek-ai/deepseek-coder-6.7b-base](https://huggingface.co/deepseek-ai/deepseek-coder-6.7b-base).
+This model is a fine-tuned version of [deepseek-ai/deepseek-coder-1.3b-base](https://huggingface.co/deepseek-ai/deepseek-coder-1.3b-base).
 It has been trained using [TRL](https://github.com/huggingface/trl).
 
 ## Quick start
