@@ -258,6 +258,7 @@ PREAMBLE = r"""\documentclass[11pt,a4paper]{article}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{pgfplots}
+\usepackage{float}
 \pgfplotsset{compat=1.18}
 \usepackage{pgfplotstable}
 
@@ -360,7 +361,8 @@ def make_models_section(results: list[dict]) -> str:
 
     n_models = len(models_json)
     n_trained = sum(
-        1 for m in models_json
+        1
+        for m in models_json
         if results_lookup.get(m["id"]) and results_lookup[m["id"]]["trained"]
     )
     table_body = "\n".join(rows)
@@ -383,6 +385,7 @@ def make_models_section(results: list[dict]) -> str:
 \end{{tabular}}}}
 \end{{table}}
 """
+
 
 def make_results_section(results: list[dict]) -> str:
     trained = [r for r in results if r["trained"]]
@@ -663,8 +666,7 @@ def make_analysis_section(results: list[dict]) -> str:
     )
     pending_ids = (
         ", ".join(
-            rf"\texttt{{{latex_escape(r['id'])}}}"
-            for r in results if not r["trained"]
+            rf"\texttt{{{latex_escape(r['id'])}}}" for r in results if not r["trained"]
         )
         or "none"
     )
@@ -685,33 +687,13 @@ def make_analysis_section(results: list[dict]) -> str:
 The following models trained successfully and produced meaningful metrics:
 {trained_ids}.
 The best-performing model overall was {best_str}.
-
-\subsection{{Pending Models}}
-
-The following models have not yet completed training:
-{pending_ids}.
-These represent larger or alternative architectures that require additional
-compute budget, or models whose training runs need to be re-attempted.
-
 \subsection{{Compute Budget}}
 
 Total GPU time across all completed runs was approximately
 \textbf{{{total_gpu_hours:.1f} GPU-hours}}.
 
-\subsection{{Recommendations}}
-
-\begin{{enumerate}}
-\item Fine-tune DeepSeek-Coder-6.7b further with a lower learning rate and
-      cosine restart schedule --- it achieved the best validation accuracy
-      ($>$96\%) with room to improve.
-\item Complete training for the remaining models (CodeLlama, Mistral, Phi,
-      Qwen2.5-Coder) to enable a full cross-architecture comparison.
-\item Evaluate the best checkpoint on the held-out test set to obtain
-      unbiased accuracy estimates.
-\item Experiment with larger LoRA rank ($r = 64$) for the 7B+ models to
-      increase adapter capacity.
-\end{{enumerate}}
 """
+
 
 def make_appendix_section(results: list[dict]) -> str:
     trained = [r for r in results if r["trained"]]
@@ -725,7 +707,7 @@ def make_appendix_section(results: list[dict]) -> str:
         block = rf"""
 \subsection{{\texttt{{{latex_escape(r['id'])}}}}}
 
-\begin{{table}}[h]
+\begin{{table}}[H]
 \centering
 \begin{{tabular}}{{ll}}
 \toprule
