@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Serve a fine-tuned model (base + LoRA adapter) via vLLM's OpenAI-compatible API.
+"""Serve a fine-tuned model via a simple REST API backed by vLLM.
+
+Exposes:
+    POST /predict   { "prompt": "<context + goal string>" }
+                 -> { "tactic": "intro n" }
 
 Usage examples
 --------------
@@ -21,13 +25,31 @@ python serve.py --model qwen2.5-coder-1.5b --adapter-path output/qwen2.5-coder-1
 
 import argparse
 import json
-import os
-import subprocess
 import sys
 from pathlib import Path
 
+import uvicorn
+from fastapi import FastAPI
+from pydantic import BaseModel as PydanticBaseModel
+from vllm import LLM, SamplingParams
+from vllm.lora.request import LoRARequest
+
 MODELS_FILE = Path(__file__).parent / "models.json"
 OUTPUT_DIR = Path(__file__).parent / "output"
+
+# ---------------------------------------------------------------------------
+# Request / Response schemas
+# ---------------------------------------------------------------------------
+
+
+class PredictRequest(PydanticBaseModel):
+    prompt: str
+    max_tokens: int = 128
+    temperature: float = 0.0
+
+
+class PredictResponse(PydanticBaseModel):
+    tactic: str
 
 
 def load_models() -> list[dict]:
@@ -98,61 +120,80 @@ def get_max_lora_rank(adapter_path: Path) -> int:
     return 64
 
 
-def build_command(args, model: dict, adapter_path: Path | None) -> list[str]:
+def load_engine(
+    args, model: dict, adapter_path: Path | None
+) -> tuple[LLM, LoRARequest | None]:
+    """Initialise the vLLM engine and optional LoRA adapter."""
     base_model = model["hf_id"]
+    lora_request = None
 
-    cmd = [
-        sys.executable,
-        "-m",
-        "vllm.entrypoints.openai.api_server",
-        "--model",
-        base_model,
-        "--port",
-        str(args.port),
-        "--tensor-parallel-size",
-        str(args.tp),
-        "--max-model-len",
-        str(args.max_model_len),
-        "--dtype",
-        "auto",
-        "--trust-remote-code",
-    ]
+    engine_kwargs = dict(
+        model=base_model,
+        tensor_parallel_size=args.tp,
+        max_model_len=args.max_model_len,
+        dtype="auto",
+        trust_remote_code=True,
+    )
+
+    if args.gpu_memory_utilization is not None:
+        engine_kwargs["gpu_memory_utilization"] = args.gpu_memory_utilization
 
     if args.merged:
-        # Serve a merged model (must have been created with merge_adapter.py)
         merged_dir = OUTPUT_DIR / model["id"] / "merged"
         if not merged_dir.exists():
             print(f"[error] Merged model not found at {merged_dir}")
             print("  Run: python merge_adapter.py --model", model["id"])
             sys.exit(1)
-        cmd[cmd.index(base_model)] = str(merged_dir)
+        engine_kwargs["model"] = str(merged_dir)
     elif adapter_path is not None:
         max_rank = get_max_lora_rank(adapter_path)
-        lora_name = f"{model['id']}-finetuned"
-        cmd += [
-            "--enable-lora",
-            "--lora-modules",
-            f"{lora_name}={adapter_path}",
-            "--max-lora-rank",
-            str(max_rank),
-        ]
-        print(f"\n  LoRA adapter will be served as model name: {lora_name}")
-        print(f"  You can also query the base model as: {base_model}")
+        engine_kwargs["enable_lora"] = True
+        engine_kwargs["max_lora_rank"] = max_rank
+        lora_request = LoRARequest(
+            lora_name=f"{model['id']}-finetuned",
+            lora_int_id=1,
+            lora_path=str(adapter_path),
+        )
+        print(f"\n  LoRA adapter: {adapter_path}")
     else:
         print(f"[warning] No adapter found for {model['id']}; serving base model only.")
 
-    if args.gpu_memory_utilization is not None:
-        cmd += ["--gpu-memory-utilization", str(args.gpu_memory_utilization)]
+    print(f"  Loading model: {engine_kwargs['model']} ...")
+    llm = LLM(**engine_kwargs)
+    return llm, lora_request
 
-    if args.host:
-        cmd += ["--host", args.host]
 
-    return cmd
+def create_app(llm: LLM, lora_request: LoRARequest | None) -> FastAPI:
+    app = FastAPI(title="Pie Tactic Predictor")
+
+    @app.post("/predict", response_model=PredictResponse)
+    def predict(req: PredictRequest):
+        sampling = SamplingParams(
+            max_tokens=req.max_tokens,
+            temperature=req.temperature,
+            stop=["\n"],
+        )
+        generate_kwargs = dict(
+            prompts=[req.prompt],
+            sampling_params=sampling,
+        )
+        if lora_request is not None:
+            generate_kwargs["lora_request"] = lora_request
+
+        outputs = llm.generate(**generate_kwargs)
+        tactic = outputs[0].outputs[0].text.strip()
+        return PredictResponse(tactic=tactic)
+
+    @app.get("/health")
+    def health():
+        return {"status": "ok"}
+
+    return app
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Serve a fine-tuned model with vLLM (OpenAI-compatible API).",
+        description="Serve a fine-tuned model with a POST /predict endpoint.",
         formatter_class=argparse.RawTextHelpFormatter,
     )
     parser.add_argument(
@@ -192,11 +233,6 @@ def main():
         default=None,
         help="Fraction of GPU memory to use (0.0-1.0). vLLM default is 0.9.",
     )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Print the vLLM command without executing.",
-    )
 
     args = parser.parse_args()
     models = load_models()
@@ -211,24 +247,14 @@ def main():
         model = pick_model(models)
 
     adapter_path = resolve_adapter_path(model, args.adapter_path)
-    cmd = build_command(args, model, adapter_path)
+    llm, lora_request = load_engine(args, model, adapter_path)
+    app = create_app(llm, lora_request)
 
-    print("\n" + "-" * 60)
-    print("  Command:")
-    print("  " + " \\\n    ".join(cmd))
-    print("-" * 60 + "\n")
+    print(f"\n  Serving on http://{args.host}:{args.port}")
+    print(f'  POST /predict  {{ "prompt": "..." }} -> {{ "tactic": "..." }}')
+    print(f"  GET  /health\n")
 
-    if args.dry_run:
-        print("[dry-run] Not launching.")
-        return
-
-    try:
-        subprocess.run(cmd, check=True)
-    except KeyboardInterrupt:
-        print("\n[info] Server stopped.")
-    except FileNotFoundError:
-        print("[error] vllm not found. Install with: pip install vllm")
-        sys.exit(1)
+    uvicorn.run(app, host=args.host, port=args.port)
 
 
 if __name__ == "__main__":
