@@ -308,8 +308,7 @@ def make_dataset_section(
     return rf"""
 \section{{Dataset}}
 
-The training corpus consists of proof tactic prediction examples extracted from
-\textsc{{Pie}} (a Pie Calculus theorem prover). Each example provides the
+The training corpus consists of proof tactic prediction examples extracted from the Pie language. Each example provides the
 current proof goal together with local and global contexts, and the model must
 predict the correct tactic to apply.
 

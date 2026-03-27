@@ -1,2 +1,0 @@
-hf_id,total_training_seconds,total_training_minutes,total_steps,total_epochs,train_samples,val_samples,final_train_loss,final_train_accuracy,best_eval_loss,best_eval_accuracy,lora_r,lora_alpha,batch_size,grad_accum,effective_batch_size,lr,epochs_config,max_seq_len
-deepseek-ai/deepseek-coder-6.7b-base,10443.2,174.05,1025,5.0,6535,727,0.0081,0.9954373285174369,0.14559230208396912,0.9688647323912316,32,64,8,4,32,0.0001,5,1024
