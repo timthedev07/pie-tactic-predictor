@@ -1,0 +1,22 @@
+services:
+  predictor:
+    build: .
+    ports:
+      - "8000:8000"
+    # Pass --model at runtime to choose which fine-tuned model to serve
+    # e.g.  docker compose run --service-ports predictor --model deepseek-coder-6.7b
+    command:
+      ["--model", "qwen2.5-coder-1.5b", "--host", "0.0.0.0", "--port", "8000"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    # Cache HuggingFace base-model downloads across container restarts
+    volumes:
+      - hf-cache:/root/.cache/huggingface
+
+volumes:
+  hf-cache:

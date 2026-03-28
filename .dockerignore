@@ -1,0 +1,24 @@
+__pycache__/
+*.pyc
+.git/
+.gitignore
+*.aux
+*.fdb_latexmk
+*.fls
+*.toc
+*.log
+*.pdf
+report.*
+training-data.jsonl
+train.py
+generate_report.py
+
+# Only ship final/ adapters – skip checkpoints & training logs
+output/*/checkpoint-*
+output/*/training_log.csv
+output/*/training_summary.csv
+output/*/test_rows.jsonl
+output/*/run_config.json
+output/*/README.md
+output/*/merged/
+output/.DS_Store

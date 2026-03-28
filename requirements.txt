@@ -1,0 +1,6 @@
+vllm>=0.8.0
+fastapi
+uvicorn[standard]
+peft
+transformers
+torch
