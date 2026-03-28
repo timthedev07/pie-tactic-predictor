@@ -290,7 +290,6 @@ def resolve_hyperparameters(model_entry: dict, cli_args) -> dict:
         if val is not None:
             hp[key] = val
 
-    # CLI quantisation flags always win
     if cli_args.load_in_4bit:
         hp["load_in_4bit"] = True
         hp["load_in_8bit"] = False
@@ -300,10 +299,6 @@ def resolve_hyperparameters(model_entry: dict, cli_args) -> dict:
 
     return hp
 
-
-# ---------------------------------------------------------------------------
-# 4. Data loading and formatting
-# ---------------------------------------------------------------------------
 
 PROMPT_TEMPLATE = """\
 ### Theorem
